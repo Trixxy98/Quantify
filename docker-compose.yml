@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: quantify-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: quantify
+      POSTGRES_PASSWORD: quantify
+      POSTGRES_DB: quantify
+    ports:
+      - "5434:5432"
+    volumes:
+      - quantify_pgdata:/var/lib/postgresql/data
+
+volumes:
+  quantify_pgdata:
