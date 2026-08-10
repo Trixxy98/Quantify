@@ -5,7 +5,7 @@ dotenv.config();
 
 const envSchema = z.object({
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
-    PORT: z.coerce.number().default(4000),
+    PORT: z.coerce.number().min(0).max(65535).default(4000),
     DATABASE_URL: z.string().min(1, "DATABASE_URL wajib diisi"),
     CORS_ORIGIN: z.string().default("http://localhost:5173"),
     JWT_ACCESS_SECRET: z.string().min(1, "JWT_ACCESS_SECRET wajib diisi"),
