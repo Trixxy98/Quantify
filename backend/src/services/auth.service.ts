@@ -33,7 +33,7 @@ async function issueTokenPair(userId: string) {
 export async function register(email: string, password: string, name: string) {
     const existing = await prisma.user.findUnique({where: {email}});
     if (existing) {
-        throw new AppError(409, "EMAIL_TOKEN", "Email already in use");
+        throw new AppError(409, "EMAIL_TAKEN", "Email already in use");
     }
 
     const passwordHash = await hashPassword(password);
