@@ -5,6 +5,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { env } from "./config/env";
 import { errorHandler } from "./middleware/errorHandler";
+import { authRouter } from "./routes/auth.routes";
 
 export const app = express();
 
@@ -20,7 +21,7 @@ app.get("/health", (req, res) => {
 // TODO: mount routes di sini bila dah siap
 // app.use("/api/auth", authRouter);
 // app.use("/api/portfolios", portfolioRouter);
-
+app.use("/api/auth", authRouter);
 app.use((req, res) => {
   res.status(404).json({ error: { code: "NOT_FOUND", message: "Route tidak wujud" } });
 });
