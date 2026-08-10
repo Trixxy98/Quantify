@@ -4,6 +4,7 @@ import {prisma} from "../lib/prisma";
 import {AppError} from "../utils/AppError";
 import {comparePassword, hashPassword, hashToken} from "../utils/hash.util";
 import {signAccessToken, signRefreshToken, verifyRefreshToken} from "../utils/jwt.util";
+import jwt from "jsonwebtoken";
 
 function refreshExpiryDate(): Date {
     const days = parseInt(env.JWT_REFRESH_EXPIRES_IN, 10) || 30;
@@ -15,11 +16,14 @@ async function issueTokenPair(userId: string) {
     const accessToken = signAccessToken(userId);
     const refreshToken = signRefreshToken(userId, jti);
 
+    const decoded = jwt.decode(refreshToken) as {exp: number};
+    const expiresAt = new Date(decoded.exp * 1000);
+
     await prisma.refreshToken.create({
         data: {
             userId,
             tokenHash: hashToken(refreshToken),
-            expiresAt: refreshExpiryDate(),
+            expiresAt
         },
     });
 
@@ -56,17 +60,20 @@ export async function login(email: string, password: string) {
     try {
       payload = verifyRefreshToken(refreshToken);
     } catch {
-      throw new AppError(401, "INVALID_REFRESH_TOKEN", "Refresh token tidak sah atau tamat tempoh");
+      throw new AppError(401, "INVALID_REFRESH_TOKEN", "Refresh token is invalid or expired");
     }
+  
     const tokenHash = hashToken(refreshToken);
-    const stored = await prisma.refreshToken.findUnique({ where: { tokenHash } });
-    if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
-      throw new AppError(401, "INVALID_REFRESH_TOKEN", "Refresh token tidak sah atau tamat tempoh");
-    }
-    await prisma.refreshToken.update({
-      where: { id: stored.id },
-      data: { revokedAt: new Date() },
+    const now = new Date();
+    const { count } = await prisma.refreshToken.updateMany({
+      where: { tokenHash, revokedAt: null, expiresAt: { gt: now } },
+      data: { revokedAt: now },
     });
+  
+    if (count !== 1) {
+      throw new AppError(401, "INVALID_REFRESH_TOKEN", "Refresh token is invalid or expired");
+    }
+  
     return issueTokenPair(payload.sub);
   }
   export async function logout(refreshToken: string) {
