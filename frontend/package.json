@@ -18,7 +18,8 @@
     "react-gauge-component": "^2.0.29",
     "react-router-dom": "^7.18.2",
     "recharts": "^3.10.1",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.3",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

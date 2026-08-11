@@ -1,12 +1,18 @@
-
-import './App.css'
+import { AppRoutes } from "./router";
+import { useAuthBootstrap } from "./hooks/useAuthBootstrap";
 
 function App() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <h1 className="text-2xl font-semibold">Quantify — setup berjaya 🎉</h1>
-    </div>
-  );
+  const isReady = useAuthBootstrap();
+
+  if (!isReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-[var(--color-text-muted)]">Memuatkan...</p>
+      </div>
+    );
+  }
+
+  return <AppRoutes />;
 }
 
 export default App;
