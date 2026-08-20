@@ -6,6 +6,7 @@ import morgan from "morgan";
 import { env } from "./config/env";
 import { errorHandler } from "./middleware/errorHandler";
 import { authRouter } from "./routes/auth.routes";
+import { portfolioRouter } from "./routes/portfolio.routes";
 
 export const app = express();
 
@@ -18,10 +19,8 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// TODO: mount routes di sini bila dah siap
-// app.use("/api/auth", authRouter);
-// app.use("/api/portfolios", portfolioRouter);
 app.use("/api/auth", authRouter);
+app.use("/api/portfolios", portfolioRouter);
 app.use((_req, res) => {
   res.status(404).json({ error: { code: "NOT_FOUND", message: "Route tidak wujud" } });
 });

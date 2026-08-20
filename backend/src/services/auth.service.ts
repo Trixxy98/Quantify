@@ -1,15 +1,9 @@
 import crypto from "crypto";
-import {env} from "../config/env";
 import {prisma} from "../lib/prisma";
 import {AppError} from "../utils/AppError";
 import {comparePassword, hashPassword, hashToken} from "../utils/hash.util";
 import {signAccessToken, signRefreshToken, verifyRefreshToken} from "../utils/jwt.util";
 import jwt from "jsonwebtoken";
-
-function refreshExpiryDate(): Date {
-    const days = parseInt(env.JWT_REFRESH_EXPIRES_IN, 10) || 30;
-    return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-}
 
 async function issueTokenPair(userId: string) {
     const jti = crypto.randomUUID();
