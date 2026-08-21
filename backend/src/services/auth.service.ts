@@ -4,6 +4,7 @@ import {AppError} from "../utils/AppError";
 import {comparePassword, hashPassword, hashToken} from "../utils/hash.util";
 import {signAccessToken, signRefreshToken, verifyRefreshToken} from "../utils/jwt.util";
 import jwt from "jsonwebtoken";
+import { Prisma } from "@prisma/client";
 
 async function issueTokenPair(userId: string) {
     const jti = crypto.randomUUID();
@@ -31,7 +32,15 @@ export async function register(email: string, password: string, name: string) {
     }
 
     const passwordHash = await hashPassword(password);
-    const user = await prisma.user.create({data: {email, passwordHash, name}});
+    let user;
+    try {
+        user = await prisma.user.create({data: {email, passwordHash, name}});
+    } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+            throw new AppError(409, "EMAIL_TAKEN", "Email already in use");
+        }
+        throw err;
+    }
 
     const tokens = await issueTokenPair(user.id);
     return {user: {id: user.id, email: user.email, name: user.name}, ...tokens};

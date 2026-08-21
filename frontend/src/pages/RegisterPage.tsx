@@ -36,8 +36,9 @@ export default function RegisterPage() {
         {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
 
         <div>
-          <label className="block text-sm text-[var(--color-text-muted)] mb-1">Nama</label>
+          <label htmlFor="name" className="block text-sm text-[var(--color-text-muted)] mb-1">Nama</label>
           <input
+            id="name"
             type="text"
             required
             value={name}
@@ -47,8 +48,9 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <label className="block text-sm text-[var(--color-text-muted)] mb-1">Email</label>
+          <label htmlFor="email" className="block text-sm text-[var(--color-text-muted)] mb-1">Email</label>
           <input
+            id="email"
             type="email"
             required
             value={email}
@@ -58,8 +60,9 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <label className="block text-sm text-[var(--color-text-muted)] mb-1">Password</label>
+          <label htmlFor="password" className="block text-sm text-[var(--color-text-muted)] mb-1">Password</label>
           <input
+            id="password"
             type="password"
             required
             minLength={8}

@@ -37,47 +37,61 @@ export async function getTrackedSymbols(): Promise<string[]> {
 export async function syncDailyPrices(symbol: string, from: Date) {
     const bars = await fetchDailyBars(symbol, from);
     const currency = currencyFromSymbol(symbol);
+    const fromDate = toUtcDate(from);
 
-    await prisma.dailyPrice.createMany({
-        data: bars.map((bar) => ({
-            symbol,
-            date: toUtcDate(bar.date),
-            open: bar.open ?? bar.close!,
-            high: bar.high ?? bar.close!,
-            low: bar.low ?? bar.close!,
-            close: bar.close!,
-            volume: BigInt(Math.round(bar.volume ?? 0)),
-            currency,
-        })),
-        skipDuplicates: true,
-    });
+    await prisma.$transaction([
+        prisma.dailyPrice.deleteMany({where: {symbol, date: {gte: fromDate}}}),
+        prisma.dailyPrice.createMany({
+            data: bars.map((bar) => ({
+                symbol,
+                date: toUtcDate(bar.date),
+                open: bar.open ?? bar.close!,
+                high: bar.high ?? bar.close!,
+                low: bar.low ?? bar.close!,
+                close: bar.close!,
+                volume: BigInt(Math.round(bar.volume ?? 0)),
+                currency,
+            })),
+            skipDuplicates: true,
+        }),
+    ]);
 }
 
 export async function syncBenchmarkPrices(symbol: string, from: Date) {
     const bars = await fetchDailyBars(symbol, from);
+    const fromDate = toUtcDate(from);
 
-    await prisma.benchmarkPrice.createMany({
-        data: bars.map((bar) => ({
-            symbol,
-            date: toUtcDate(bar.date),
-            close: bar.close!,
-        })),
-        skipDuplicates: true,
-    });
+    await prisma.$transaction([
+        prisma.benchmarkPrice.deleteMany({where: {symbol, date: {gte: fromDate}}}),
+        prisma.benchmarkPrice.createMany({
+            data: bars.map((bar) => ({
+                symbol,
+                date: toUtcDate(bar.date),
+                close: bar.close!,
+            })),
+            skipDuplicates: true,
+        }),
+    ]);
 }
 
 export async function syncUsdMyrRate(from: Date) {
     const bars = await fetchDailyBars(USD_MYR_SYMBOL, from);
+    const fromDate = toUtcDate(from);
 
-    await prisma.exchangeRate.createMany({
-        data: bars.map((bar) => ({
-            from: Currency.USD,
-            to: Currency.MYR,
-            date: toUtcDate(bar.date),
-            rate: bar.close!,
-        })),
-        skipDuplicates: true,
-    });
+    await prisma.$transaction([
+        prisma.exchangeRate.deleteMany({
+            where: {from: Currency.USD, to: Currency.MYR, date: {gte: fromDate}},
+        }),
+        prisma.exchangeRate.createMany({
+            data: bars.map((bar) => ({
+                from: Currency.USD,
+                to: Currency.MYR,
+                date: toUtcDate(bar.date),
+                rate: bar.close!,
+            })),
+            skipDuplicates: true,
+        }),
+    ]);
 }
 
 export async function syncMarketData(daysBack = 400) {

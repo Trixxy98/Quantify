@@ -23,7 +23,11 @@ export async function rebuildSnapshots(portfolioId: string) {
         where: {portfolioId},
         orderBy: [{date: "asc"}, {createdAt: "asc"}],
     });
-    if (transactions.length === 0) return 0;
+    if (transactions.length === 0) {
+        //Semua transaction dah dipadam - bersihkan snapshot obsolete
+        await prisma.portfolioSnapshot.deleteMany({where: {portfolioId}});
+        return 0;
+    }
 
     const symbols = [...new Set(transactions.map((t) => t.symbol))];
     const firstDate = transactions[0].date;
@@ -53,10 +57,10 @@ export async function rebuildSnapshots(portfolioId: string) {
     }
     const calendar = [...calendarSet].sort((a,b) => a-b);
 
-    function toBase(value: number, currency: Currency, time: number): number {
+    function toBase(value: number, currency: Currency, time: number): number | null{
         if (currency === portfolio!.baseCurrency) return value;
         const rate = latestCloseAtOrBefore(rateSeries, time);
-        if (rate == null) return value;
+        if (rate == null) return null;
         return currency === Currency.USD ? value * rate : value / rate;
     }
 
@@ -86,6 +90,8 @@ export async function rebuildSnapshots(portfolioId: string) {
 
         let totalValue = 0;
         let totalCost = 0;
+        let rateAvailable = true;
+
         for (const symbol of symbols) {
             const quantity = qtyBySymbol.get(symbol) ?? 0;
             if (quantity <= 0) continue;
@@ -94,22 +100,36 @@ export async function rebuildSnapshots(portfolioId: string) {
             if (close == null) continue;
 
             const currency = currencyFromSymbol(symbol);
-            totalValue += toBase(quantity * close, currency, time);
-            totalCost += toBase(costBySymbol.get(symbol) ?? 0, currency, time);
+            const value = toBase(quantity * close, currency, time);
+            const cost = toBase(costBySymbol.get(symbol) ?? 0, currency, time);
+
+            if (value == null || cost == null) {
+                rateAvailable = false;
+                break;
+            }
+
+            totalValue += value;
+            totalCost += cost;
         }
 
+        //Kadar FX tiada untuk tarikh ini - jangan simpan nilai yang salah
+        if (!rateAvailable) continue;
         snapshots.push({date: new Date(time), totalValue, totalCost});
     }
 
-    // Upsert (bukan skipDuplicates) — rebuild selepas transaction baru/padam
-    // perlu refresh nilai snapshot lama juga
+await prisma.$transaction(async (tx) => {
+    await tx.portfolioSnapshot.deleteMany({
+        where: {portfolioId, date: {lt: firstDate}},
+    });
+
     for (const snapshot of snapshots) {
-        await prisma.portfolioSnapshot.upsert({
+        await tx.portfolioSnapshot.upsert({
             where: {portfolioId_date: {portfolioId, date: snapshot.date}},
             create: {portfolioId, ...snapshot},
             update: {totalValue: snapshot.totalValue, totalCost: snapshot.totalCost},
         });
     }
+});
 
     return snapshots.length;
 }
