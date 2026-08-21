@@ -29,3 +29,7 @@ export const listTransactionsQuerySchema = z.object({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
 });
+
+export const rangeQuerySchema = z.object({
+    range: z.enum(["1M", "3M", "6M", "1Y", "YTD", "ALL"]).default("1Y"),
+});
