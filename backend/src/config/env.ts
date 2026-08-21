@@ -12,6 +12,7 @@ const envSchema = z.object({
     JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET mesti sekurang-kurangnya 32 aksara"),
     JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
     JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
+    RISK_FREE_RATE: z.coerce.number().min(0).max(1).default(0.03),
     });
     const parsed = envSchema.safeParse(process.env);
     if (!parsed.success) {

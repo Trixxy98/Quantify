@@ -1,6 +1,7 @@
 import {Request, Response} from "express";
 import * as portfolioService from "../services/portfolio.service";
-import {listTransactionsQuerySchema} from "../validators/portfolio.validator";
+import * as dashboardService from "../services/dashboard.service";
+import { listTransactionsQuerySchema, rangeQuerySchema } from "../validators/portfolio.validator";
 
 export async function listPortfoliosHandler(req: Request, res: Response) {
     const portfolios = await portfolioService.listPortfolios(req.userId!);
@@ -49,3 +50,24 @@ export async function listTransactionsHandler(req: Request, res: Response) {
     res.status(204).send();
   }
   
+  export async function getSummaryHandler(req: Request, res: Response) {
+    const result = await dashboardService.getSummary(req.params.id, req.userId!);
+    res.json(result);
+}
+
+export async function getMetricsHandler(req: Request, res: Response) {
+    const { range } = rangeQuerySchema.parse(req.query);
+    const result = await dashboardService.getMetrics(req.params.id, req.userId!, range);
+    res.json(result);
+}
+
+export async function getPerformanceHandler(req: Request, res: Response) {
+    const { range } = rangeQuerySchema.parse(req.query);
+    const result = await dashboardService.getPerformance(req.params.id, req.userId!, range);
+    res.json(result);
+}
+
+export async function getAllocationHandler(req: Request, res: Response) {
+    const result = await dashboardService.getAllocation(req.params.id, req.userId!);
+    res.json(result);
+}
