@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { loginRequest } from "../api/auth.api";
 import { useAuthStore } from "../store/auth.store";
+import axios from "axios";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -20,8 +21,9 @@ export default function LoginPage() {
       const { user, accessToken, refreshToken } = await loginRequest(email, password);
       setAuth(user, accessToken, refreshToken);
       navigate("/dashboard");
-    } catch {
-      setError("Email atau password salah");
+    } catch (err) {
+      const isUnauthorized = axios.isAxiosError(err) && err.response?.status === 401;
+      setError(isUnauthorized ? "Email atau password salah" : "Log masuk gagal. Cuba lagi.");
     } finally {
       setIsLoading(false);
     }

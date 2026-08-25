@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { registerRequest } from "../api/auth.api";
 import { useAuthStore } from "../store/auth.store";
+import axios from "axios";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -21,8 +22,9 @@ export default function RegisterPage() {
       const { user, accessToken, refreshToken } = await registerRequest(email, password, name);
       setAuth(user, accessToken, refreshToken);
       navigate("/dashboard");
-    } catch {
-      setError("Pendaftaran gagal — cuba email lain");
+    } catch (err) {
+      const isTaken = axios.isAxiosError(err) && err.response?.status === 409;
+      setError(isTaken ? "Email ini sudah didaftarkan" : "Pendaftaran gagal. Cuba lagi.");
     } finally {
       setIsLoading(false);
     }
