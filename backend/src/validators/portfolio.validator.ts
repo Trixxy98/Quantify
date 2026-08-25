@@ -8,7 +8,7 @@ export const createPortfolioSchema = z.object({
 export const updatePortfolioSchema = z
     .object({
         name: z.string().min(1).optional(),
-        basicCurrency: z.enum(["MYR", "USD"]).optional(),
+        baseCurrency: z.enum(["MYR", "USD"]).optional(),
     })
     .refine((data) => Object.keys(data).length > 0, {
         message: "At least one field is required",

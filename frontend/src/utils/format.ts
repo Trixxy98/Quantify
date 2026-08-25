@@ -4,8 +4,9 @@ const currencyFormatter = new Intl.NumberFormat("en-MY", {
 });
 
 export function formatMoney(value: number, currency: "MYR" | "USD"): string {
-    const prefix = currency === "MYR" ? "RM " : "US$";
-    return `${prefix}${currencyFormatter.format(value)}`;
+    const prefix = currency === "MYR" ? "RM " : "US$ ";
+    const abs = currencyFormatter.format(Math.abs(value));
+    return value < 0 ? `-${prefix}${abs}` : `${prefix}${abs}`;
 }
 
 export function formatPct(value: number, digits = 2): string {

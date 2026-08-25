@@ -107,9 +107,12 @@ export async function createTransaction(
 ) {
     await getOwnedPortfolio(portfolioId, userId);
 
+    const symbol = input.symbol.toUpperCase();
+    const payload = { ...input, symbol };
+
     return prisma.$transaction(async (tx) => {
-        const transaction = await tx.transaction.create({data: {portfolioId, ...input}});
-        await recomputeHolding(tx, portfolioId, input.symbol, input.currency);
+        const transaction = await tx.transaction.create({data: {portfolioId, ...payload}});
+        await recomputeHolding(tx, portfolioId, symbol, payload.currency);
         return transaction;
     });
 }

@@ -117,19 +117,26 @@ export async function rebuildSnapshots(portfolioId: string) {
         snapshots.push({date: new Date(time), totalValue, totalCost});
     }
 
-await prisma.$transaction(async (tx) => {
-    await tx.portfolioSnapshot.deleteMany({
-        where: {portfolioId, date: {lt: firstDate}},
-    });
+    const rebuiltDates = snapshots.map((snapshot) => snapshot.date);
 
-    for (const snapshot of snapshots) {
-        await tx.portfolioSnapshot.upsert({
-            where: {portfolioId_date: {portfolioId, date: snapshot.date}},
-            create: {portfolioId, ...snapshot},
-            update: {totalValue: snapshot.totalValue, totalCost: snapshot.totalCost},
+    await prisma.$transaction(async (tx) => {
+        await tx.portfolioSnapshot.deleteMany({
+            where: {
+                portfolioId,
+                ...(rebuiltDates.length > 0
+                    ? { date: { notIn: rebuiltDates } }
+                    : {}),
+            },
         });
-    }
-});
+    
+        for (const snapshot of snapshots) {
+            await tx.portfolioSnapshot.upsert({
+                where: {portfolioId_date: {portfolioId, date: snapshot.date}},
+                create: {portfolioId, ...snapshot},
+                update: {totalValue: snapshot.totalValue, totalCost: snapshot.totalCost},
+            });
+        }
+    });
 
     return snapshots.length;
 }

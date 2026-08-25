@@ -15,13 +15,15 @@ apiClient.interceptors.request.use((config) => {
 
 let refreshPromise: Promise<string> | null = null;
 
-async function refreshAccessToken(): Promise<string> {
-    const refreshToken = useAuthStore.getState().refreshToken;
-    if (!refreshToken) {
-        throw new Error("No refresh token found");
+async function refreshAccessToken(sessionToken: string): Promise<string> {
+    const { data } = await axios.post(`${apiClient.defaults.baseURL}/auth/refresh`, {
+      refreshToken: sessionToken,
+    });
+  
+    if (useAuthStore.getState().refreshToken !== sessionToken) {
+      throw new Error("Session changed during refresh");
     }
-
-    const {data} = await axios.post(`${apiClient.defaults.baseURL}/auth/refresh`, {refreshToken});
+  
     useAuthStore.getState().setTokens(data.accessToken, data.refreshToken);
     return data.accessToken;
 }
@@ -29,28 +31,35 @@ async function refreshAccessToken(): Promise<string> {
 apiClient.interceptors.response.use(
     (response) => response,
     async (error: AxiosError) => {
-        const originalRequest = error.config as InternalAxiosRequestConfig & {_retry?: boolean};
-
-        const isRefreshCall = originalRequest.url?.includes("/auth/refresh");
-        if (error.response?.status !== 401 || originalRequest._retry || isRefreshCall) {
-            return Promise.reject(error);
+      const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+  
+      const isRefreshCall = originalRequest.url?.includes("/auth/refresh");
+      if (error.response?.status !== 401 || originalRequest._retry || isRefreshCall) {
+        return Promise.reject(error);
+      }
+  
+      originalRequest._retry = true;
+      const sessionToken = useAuthStore.getState().refreshToken;
+  
+      if (!sessionToken) {
+        return Promise.reject(error);
+      }
+  
+      try {
+        if (!refreshPromise) {
+          refreshPromise = refreshAccessToken(sessionToken).finally(() => {
+            refreshPromise = null;
+          });
         }
-
-        originalRequest._retry = true;
-
-        try {
-            if (!refreshPromise) {
-                refreshPromise = refreshAccessToken().finally(() => {
-                    refreshPromise = null;
-                });
-            }
-            const newAccessToken = await refreshPromise;
-
-            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-            return apiClient(originalRequest);
-        }catch (refreshError) {
-            useAuthStore.getState().logout();
-            return Promise.reject(refreshError);
+        const newAccessToken = await refreshPromise;
+  
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        if (useAuthStore.getState().refreshToken === sessionToken) {
+          useAuthStore.getState().logout();
         }
+        return Promise.reject(refreshError);
+      }
     }
-);
+  );
