@@ -1,6 +1,7 @@
 import { apiClient } from "./client";
 import type {
   CreateTransactionInput,
+  Currency,
   Holding,
   Portfolio,
   PortfolioAllocation,
@@ -54,5 +55,10 @@ export async function getPortfolioAllocation(portfolioId: string): Promise<Portf
 
 export async function listHoldings(portfolioId: string): Promise<Holding[]> {
   const { data } = await apiClient.get<Holding[]>(`/portfolios/${portfolioId}/holdings`);
+  return data;
+}
+
+export async function createPortfolio(name: string, baseCurrency: Currency = "MYR"): Promise<Portfolio> {
+  const {data} = await apiClient.post<Portfolio>("/portfolios", {name, baseCurrency});
   return data;
 }
