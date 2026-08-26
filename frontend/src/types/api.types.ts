@@ -66,3 +66,15 @@ export type PortfolioAllocation = {
     totalValue: number;
     items: AllocationItem[];
 };
+
+export type TransactionType = "BUY" | "SELL";
+
+export type CreateTransactionInput = {
+    symbol: string;
+    type: TransactionType;
+    quantity: number;
+    price: number;
+    currency: Currency;
+    fee?: number;
+    date: string;
+};

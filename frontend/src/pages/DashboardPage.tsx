@@ -13,6 +13,8 @@ import { formatMoney, formatNumber, formatPct, formatPctAbs } from "../utils/for
 import { HoldingsTable } from "../components/dashboard/HoldingsTable";
 import { useHoldings } from "../hooks/useHoldings";
 import type { Range } from "../types/api.types";
+import { AddTransactionForm } from "../components/dashboard/AddTransactionForm";
+import { SyncButton } from "../components/dashboard/SyncButton";
 
 
 const RANGES: Range[] = ["1M", "3M", "6M", "1Y", "YTD", "ALL"];
@@ -58,6 +60,7 @@ export default function DashboardPage() {
           >
             Log keluar
           </button>
+          <SyncButton />
         </div>
       </header>
 
@@ -126,6 +129,7 @@ export default function DashboardPage() {
           currency={currency}
           isLoading={isHoldingsLoading}
         />
+        {portfolioId && <AddTransactionForm portfolioId={portfolioId} />}
       </main>
     </div>
   );

@@ -1,5 +1,6 @@
 import { apiClient } from "./client";
 import type {
+  CreateTransactionInput,
   Holding,
   Portfolio,
   PortfolioAllocation,
@@ -8,6 +9,16 @@ import type {
   PortfolioSummary,
   Range,
 } from "../types/api.types";
+
+export async function createTransaction(portfolioId: string, input: CreateTransactionInput) {
+  const {data} = await apiClient.post(`/portfolios/${portfolioId}/transactions`, input);
+  return data;
+}
+
+export async function syncMarketData() {
+  const {data} = await apiClient.post("/sync");
+  return data;
+}
 
 export async function listPortfolios(): Promise<Portfolio[]> {
   const { data } = await apiClient.get<Portfolio[]>("/portfolios");
