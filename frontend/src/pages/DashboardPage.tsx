@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect} from "react";
 import { MetricCard } from "../components/dashboard/MetricCard";
 import { useAuthStore } from "../store/auth.store";
 import { usePortfolioMetrics } from "../hooks/usePortfolioMetrics";
@@ -15,6 +15,7 @@ import { useHoldings } from "../hooks/useHoldings";
 import type { Range } from "../types/api.types";
 import { AddTransactionForm } from "../components/dashboard/AddTransactionForm";
 import { SyncButton } from "../components/dashboard/SyncButton";
+import {CreatePortfolioForm} from "../components/dashboard/CreatePortfolioForm";
 
 
 const RANGES: Range[] = ["1M", "3M", "6M", "1Y", "YTD", "ALL"];
@@ -25,7 +26,20 @@ export default function DashboardPage() {
   const [range, setRange] = useState<Range>("1Y");
 
   const { data: portfolios, isLoading: isPortfoliosLoading } = usePortfolios();
-  const portfolioId = portfolios?.[0]?.id;
+  const [selectedId, setSelectedId] = useState<string | undefined>();
+
+useEffect(() => {
+  if (!portfolios || portfolios.length === 0) {
+    setSelectedId(undefined);
+    return;
+  }
+  const stillExists = selectedId && portfolios.some((p) => p.id === selectedId);
+  if (!stillExists) {
+    setSelectedId(portfolios[0].id);
+  }
+}, [portfolios, selectedId]);
+
+const portfolioId = selectedId;
 
   const { data: summary, isLoading: isSummaryLoading } = usePortfolioSummary(portfolioId);
   const { data: metrics, isLoading: isMetricsLoading, error: metricsError } = usePortfolioMetrics(
@@ -51,6 +65,25 @@ export default function DashboardPage() {
           <p className="text-xs uppercase tracking-wide text-[var(--color-text-muted)]">Quantify</p>
           <h1 className="text-xl font-semibold">{summary?.name ?? "Dashboard"}</h1>
         </div>
+          {portfolios && portfolios.length > 0 && (
+            <label htmlFor="portfolio-select" className="sr-only">
+              Portfolio
+            </label>
+          )}
+          {portfolios && portfolios.length > 0 && (
+            <select
+              id="portfolio-select"
+              value={portfolioId}
+              onChange={(e) => setSelectedId(e.target.value)}
+              className="mt-2 rounded-md bg-transparent border border-slate-600 px-2 py-1 text-sm"
+            >
+              {portfolios.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
         <div className="flex items-center gap-4">
           <span className="text-sm text-[var(--color-text-muted)]">{user?.name}</span>
           <button
@@ -66,9 +99,7 @@ export default function DashboardPage() {
 
       <main className="p-8 space-y-6">
         {!isPortfoliosLoading && !portfolioId && (
-          <p className="text-[var(--color-text-muted)]">
-            Tiada portfolio lagi. Tambah portfolio + transaction di backend, lepas tu sync.
-          </p>
+          <CreatePortfolioForm onCreated={setSelectedId} />
         )}
 
         <div className="flex flex-wrap gap-2">
