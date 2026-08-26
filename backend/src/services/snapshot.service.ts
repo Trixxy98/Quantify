@@ -77,9 +77,16 @@ export async function rebuildSnapshots(portfolioId: string) {
             const currentQty = qtyBySymbol.get(t.symbol) ?? 0;
             const currentCost = costBySymbol.get(t.symbol) ?? 0;
 
+            const currency = t.currency;
             if (t.type === TransactionType.BUY) {
+                const nativeCost = q * Number(t.price) + Number(t.fee);
+                const baseCost =
+                    toBase(nativeCost, currency, t.date.getTime()) ??
+                    toBase(nativeCost, currency, time);
                 qtyBySymbol.set(t.symbol, currentQty + q);
-                costBySymbol.set(t.symbol, currentCost + q * Number(t.price) + Number(t.fee));
+                if (baseCost != null) {
+                    costBySymbol.set(t.symbol, currentCost + baseCost);
+                }
             } else {
                 const avgCost = currentQty > 0 ? currentCost / currentQty : 0;
                 qtyBySymbol.set(t.symbol, currentQty - q);
@@ -101,20 +108,22 @@ export async function rebuildSnapshots(portfolioId: string) {
 
             const currency = currencyFromSymbol(symbol);
             const value = toBase(quantity * close, currency, time);
-            const cost = toBase(costBySymbol.get(symbol) ?? 0, currency, time);
-
-            if (value == null || cost == null) {
+            if (value == null) {
                 rateAvailable = false;
                 break;
             }
 
             totalValue += value;
-            totalCost += cost;
+            totalCost += costBySymbol.get(symbol) ?? 0;
         }
 
         //Kadar FX tiada untuk tarikh ini - jangan simpan nilai yang salah
         if (!rateAvailable) continue;
         snapshots.push({date: new Date(time), totalValue, totalCost});
+    }
+
+    if (snapshots.length === 0) {
+        return 0;
     }
 
     const rebuiltDates = snapshots.map((snapshot) => snapshot.date);
@@ -123,12 +132,10 @@ export async function rebuildSnapshots(portfolioId: string) {
         await tx.portfolioSnapshot.deleteMany({
             where: {
                 portfolioId,
-                ...(rebuiltDates.length > 0
-                    ? { date: { notIn: rebuiltDates } }
-                    : {}),
+                date: { notIn: rebuiltDates },
             },
         });
-    
+
         for (const snapshot of snapshots) {
             await tx.portfolioSnapshot.upsert({
                 where: {portfolioId_date: {portfolioId, date: snapshot.date}},
