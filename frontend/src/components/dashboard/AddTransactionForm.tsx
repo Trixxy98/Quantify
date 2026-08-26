@@ -19,21 +19,29 @@ export function AddTransactionForm({portfolioId}: Props) {
     const [quantity, setQuantity] = useState("1");
     const [price, setPrice] = useState("");
     const [fee, setFee] = useState("0");
-    const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+    const [date, setDate] = useState(() => {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        const dd = String(now.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+      });
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
     const mutation = useMutation({
-        mutationFn: () =>
-            createTransaction(portfolioId, {
-                symbol: symbol.trim(),
+        mutationFn: () => {
+            const normalizedSymbol = symbol.trim().toUpperCase();
+             return createTransaction(portfolioId, {
+                symbol: normalizedSymbol,
                 type,
                 quantity: Number(quantity),
                 price: Number(price),
-                currency: currencyFromSymbol(symbol),
+                currency: currencyFromSymbol(normalizedSymbol),
                 fee: Number(fee) || 0,
                 date,
-            }),
+            });
+        },
         onSuccess: async () => {
             setError(null);
             setSuccess("Transaction added successfully. Press Sync to update portfolio data.");
