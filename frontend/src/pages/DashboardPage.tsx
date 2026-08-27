@@ -27,6 +27,7 @@ export default function DashboardPage() {
 
   const { data: portfolios, isLoading: isPortfoliosLoading } = usePortfolios();
   const [selectedId, setSelectedId] = useState<string | undefined>();
+  const [isCreating, setIsCreating] = useState(false);
 
 useEffect(() => {
   if (!portfolios || portfolios.length === 0) {
@@ -71,6 +72,7 @@ const portfolioId = selectedId;
             </label>
           )}
           {portfolios && portfolios.length > 0 && (
+            <div className="flex items-center gap-2">
             <select
               id="portfolio-select"
               value={portfolioId}
@@ -83,6 +85,14 @@ const portfolioId = selectedId;
                 </option>
               ))}
             </select>
+            <button
+                type="button"
+                onClick={() => setIsCreating((open) => !open)}
+                className="mt-2 rounded-md border border-slate-600 px-2 py-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+                >
+                 {isCreating ? "Cancel" : "Create Portfolio"}
+              </button>
+              </div>
           )}
         <div className="flex items-center gap-4">
           <span className="text-sm text-[var(--color-text-muted)]">{user?.name}</span>
@@ -100,6 +110,14 @@ const portfolioId = selectedId;
       <main className="p-8 space-y-6">
         {!isPortfoliosLoading && !portfolioId && (
           <CreatePortfolioForm onCreated={setSelectedId} />
+        )}
+        {portfolioId && isCreating && (
+          <CreatePortfolioForm
+          onCreated={(id) => {
+            setSelectedId(id);
+            setIsCreating(false);
+          }}
+          />
         )}
 
         <div className="flex flex-wrap gap-2">
