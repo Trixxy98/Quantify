@@ -71,3 +71,14 @@ export async function getAllocationHandler(req: Request, res: Response) {
     const result = await dashboardService.getAllocation(req.params.id, req.userId!);
     res.json(result);
 }
+
+export async function getPriceSeriesHandler(req: Request, res: Response) {
+    const {range} = rangeQuerySchema.parse(req.query);
+    const result = await dashboardService.getPriceSeries(
+        req.params.id,
+        req.userId!,
+        req.params.symbol,
+        range
+    );
+    res.json(result);
+}

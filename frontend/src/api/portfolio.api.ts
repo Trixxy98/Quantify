@@ -3,6 +3,7 @@ import type {
   CreateTransactionInput,
   Currency,
   Holding,
+  HoldingPriceSeries,
   Portfolio,
   PortfolioAllocation,
   PortfolioMetrics,
@@ -59,9 +60,33 @@ export async function listHoldings(portfolioId: string): Promise<Holding[]> {
   return data;
 }
 
+export async function getHoldingPrices(
+  portfolioId: string,
+  symbol: string,
+  range: Range
+): Promise<HoldingPriceSeries> {
+  const {data} = await apiClient.get<HoldingPriceSeries>(
+    `/portfolios/${portfolioId}/prices/${encodeURIComponent(symbol)}`,
+    {params: {range}}
+  );
+  return data;
+}
+
 export async function createPortfolio(name: string, baseCurrency: Currency = "MYR"): Promise<Portfolio> {
   const {data} = await apiClient.post<Portfolio>("/portfolios", {name, baseCurrency});
   return data;
+}
+
+export async function updatePortfolio(
+  portfolioId: string,
+  data: {name?: string; baseCurrency?: Currency}
+): Promise<Portfolio> {
+  const {data: portfolio} = await apiClient.patch<Portfolio>(`/portfolios/${portfolioId}`, data);
+  return portfolio;
+}
+
+export async function deletePortfolio(portfolioId: string): Promise<void> {
+  await apiClient.delete(`/portfolios/${portfolioId}`);
 }
 
 export async function listTransactions(
