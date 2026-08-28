@@ -44,6 +44,16 @@ export async function listTransactionsHandler(req: Request, res: Response) {
     const transaction = await portfolioService.createTransaction(req.params.id, req.userId!, req.body);
     res.status(201).json(transaction);
   }
+
+  export async function updateTransactionHandler(req: Request, res: Response) {
+    const transaction = await portfolioService.updateTransaction(
+      req.params.id,
+      req.params.txId,
+      req.userId!,
+      req.body
+    );
+    res.json(transaction);
+  }
   
   export async function deleteTransactionHandler(req: Request, res: Response) {
     await portfolioService.deleteTransaction(req.params.id, req.params.txId, req.userId!);

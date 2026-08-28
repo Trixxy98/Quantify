@@ -31,4 +31,9 @@ portfolioRouter.post(
     validate(createTransactionSchema),
     portfolioController.createTransactionHandler
 );
+portfolioRouter.patch(
+    "/:id/transactions/:txId",
+    validate(createTransactionSchema),
+    portfolioController.updateTransactionHandler
+);
 portfolioRouter.delete("/:id/transactions/:txId", portfolioController.deleteTransactionHandler);

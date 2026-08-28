@@ -3,12 +3,15 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteTransaction } from "../../api/portfolio.api";
 import { useTransactions } from "../../hooks/useTransactions";
 import { formatMoney } from "../../utils/format";
+import type { Transaction } from "../../types/api.types";
 
 type Props = {
   portfolioId: string;
+  editingId?: string | null;
+  onEdit: (transaction: Transaction) => void;
 };
 
-export function TransactionsTable({ portfolioId }: Props) {
+export function TransactionsTable({ portfolioId, editingId, onEdit }: Props) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const { data, isLoading } = useTransactions(portfolioId, page);
@@ -48,7 +51,10 @@ export function TransactionsTable({ portfolioId }: Props) {
           </thead>
           <tbody>
             {rows.map((tx) => (
-              <tr key={tx.id} className="border-t border-slate-700">
+              <tr
+                key={tx.id}
+                className={`border-t border-slate-700 ${tx.id === editingId ? "bg-slate-800/60" : ""}`}
+              >
                 <td className="py-2">{tx.date.slice(0, 10)}</td>
                 <td className={`py-2 ${tx.type === "BUY" ? "text-[var(--color-accent)]" : "text-[var(--color-danger)]"}`}>
                   {tx.type}
@@ -57,7 +63,15 @@ export function TransactionsTable({ portfolioId }: Props) {
                 <td className="py-2 text-right">{Number(tx.quantity).toLocaleString()}</td>
                 <td className="py-2 text-right">{formatMoney(Number(tx.price), tx.currency)}</td>
                 <td className="py-2 text-right">{formatMoney(Number(tx.fee), tx.currency)}</td>
-                <td className="py-2 text-right">
+                <td className="py-2 text-right whitespace-nowrap">
+                  <button
+                    type="button"
+                    disabled={tx.id === editingId}
+                    onClick={() => onEdit(tx)}
+                    className="text-xs text-[var(--color-text-muted)] mr-3 disabled:opacity-50"
+                  >
+                    {tx.id === editingId ? "Editing" : "Edit"}
+                  </button>
                   <button
                     type="button"
                     disabled={mutation.isPending}

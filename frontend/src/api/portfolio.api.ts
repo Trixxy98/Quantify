@@ -2,6 +2,7 @@ import { apiClient } from "./client";
 import type {
   CreateTransactionInput,
   Currency,
+  UpdateTransactionInput,
   Holding,
   HoldingPriceSeries,
   Portfolio,
@@ -98,6 +99,15 @@ export async function listTransactions(
     `/portfolios/${portfolioId}/transactions`,
     {params: {page, limit}}
   );
+  return data;
+}
+
+export async function updateTransaction(
+  portfolioId: string,
+  transactionId: string,
+  input: UpdateTransactionInput
+) {
+  const {data} = await apiClient.patch(`/portfolios/${portfolioId}/transactions/${transactionId}`, input);
   return data;
 }
 

@@ -170,6 +170,60 @@ export async function createTransaction(
     });
 }
 
+export async function updateTransaction(
+    portfolioId: string,
+    transactionId: string,
+    userId: string,
+    input: {
+        symbol: string;
+        type: TransactionType;
+        quantity: number;
+        price: number;
+        currency: Currency;
+        fee: number;
+        date: Date;
+    }
+) {
+    await getOwnedPortfolio(portfolioId, userId);
+
+    const symbol = input.symbol.toUpperCase();
+
+    return prisma.$transaction(async (tx) => {
+        const existing = await tx.transaction.findUnique({where: {id: transactionId}});
+        if (!existing || existing.portfolioId !== portfolioId) {
+            throw new AppError(404, "NOT_FOUND", "Transaction not found");
+        }
+
+        const previousSymbol = existing.symbol;
+        const previousCurrency = existing.currency;
+
+        const transaction = await tx.transaction.update({
+            where: {id: transactionId},
+            data: {
+                symbol,
+                type: input.type,
+                quantity: input.quantity,
+                price: input.price,
+                currency: input.currency,
+                fee: input.fee,
+                date: input.date,
+            },
+        });
+
+        await recomputeHolding(
+            tx,
+            portfolioId,
+            previousSymbol,
+            previousSymbol === symbol ? input.currency : previousCurrency
+        );
+        if (symbol !== previousSymbol) {
+            await recomputeHolding(tx, portfolioId, symbol, input.currency);
+        }
+
+        return transaction;
+    });
+}
+
 export async function deleteTransaction(portfolioId: string, transactionId: string, userId: string) {
     await getOwnedPortfolio(portfolioId, userId);
 

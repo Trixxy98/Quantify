@@ -98,6 +98,8 @@ export type CreateTransactionInput = {
     date: string;
 };
 
+export type UpdateTransactionInput = CreateTransactionInput;
+
 export type Transaction = {
     id: string;
     portfolioId: string;
