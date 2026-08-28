@@ -60,13 +60,13 @@ export function beta(portfolioReturns: number[], benchmarkReturns: number[]): nu
       const drawdown = (point.value - peak) / peak;
       if (drawdown < maxDD) maxDD = drawdown;
     }
-    return maxDD; // contoh: -0.23 bermaksud -23%
+    return maxDD; // e.g. -0.23 means -23%
   }
 
   export function compositeBenchmarkReturns(
     klciReturns: number[],
     sp500Returns: number[],
-    bursaWeight: number, // contoh 0.6 kalau 60% nilai portfolio di Bursa
+    bursaWeight: number, // e.g. 0.6 if 60% of portfolio value is Bursa
     usWeight: number
   ): number[] {
     return klciReturns.map((r, i) => r * bursaWeight + sp500Returns[i] * usWeight);

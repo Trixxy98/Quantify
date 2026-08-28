@@ -24,7 +24,7 @@ export default function RegisterPage() {
       navigate("/dashboard");
     } catch (err) {
       const isTaken = axios.isAxiosError(err) && err.response?.status === 409;
-      setError(isTaken ? "Email ini sudah didaftarkan" : "Pendaftaran gagal. Cuba lagi.");
+      setError(isTaken ? "This email is already registered" : "Registration failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -33,12 +33,12 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center">
       <form onSubmit={handleSubmit} className="w-full max-w-sm bg-[var(--color-surface)] p-8 rounded-xl space-y-4">
-        <h1 className="text-xl font-semibold text-center">Daftar Akaun Quantify</h1>
+        <h1 className="text-xl font-semibold text-center">Create a Quantify account</h1>
 
         {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
 
         <div>
-          <label htmlFor="name" className="block text-sm text-[var(--color-text-muted)] mb-1">Nama</label>
+          <label htmlFor="name" className="block text-sm text-[var(--color-text-muted)] mb-1">Name</label>
           <input
             id="name"
             type="text"
@@ -79,11 +79,11 @@ export default function RegisterPage() {
           disabled={isLoading}
           className="w-full rounded-md bg-[var(--color-accent)] py-2 text-sm font-medium text-slate-900 disabled:opacity-50"
         >
-          {isLoading ? "Mendaftar..." : "Daftar"}
+          {isLoading ? "Creating account..." : "Register"}
         </button>
 
         <p className="text-sm text-center text-[var(--color-text-muted)]">
-          Dah ada akaun? <Link to="/login" className="text-[var(--color-accent)]">Log Masuk</Link>
+          Already have an account? <Link to="/login" className="text-[var(--color-accent)]">Sign in</Link>
         </p>
       </form>
     </div>

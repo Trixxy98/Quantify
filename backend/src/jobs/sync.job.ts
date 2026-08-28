@@ -20,8 +20,8 @@ export async function runFullSync(daysBack = 400) {
 }
 
 
-// 6:30 pagi MYT, Selasa-Sabtu — selepas pasaran US tutup (4-5 pagi MYT).
-// Sync harian cuma perlu 7 hari ke belakang (cover cuti panjang), bukan 400.
+// 6:30am MYT, Tue–Sat — after US market close (4–5am MYT).
+// Daily sync only needs 7 days back (covers long weekends), not 400.
 export function scheduleDailySync() {
     cron.schedule(
         "30 6 * * 2-6",

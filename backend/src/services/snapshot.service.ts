@@ -4,8 +4,8 @@ import {currencyFromSymbol} from "./market.service";
 
 type PricePoint = {date: number, close: number};
 
-// Harga penutup terakhir pada atau sebelum `time` — forward-fill untuk
-// hari cuti pasaran (contoh: Bursa cuti tapi US buka)
+// Last close on or before `time` — forward-fill for market holidays
+// (e.g. Bursa closed while US is open)
 function latestCloseAtOrBefore(series: PricePoint[], time: number): number | null {
     let result: number | null = null;
     for (const point of series) {
@@ -24,7 +24,7 @@ export async function rebuildSnapshots(portfolioId: string) {
         orderBy: [{date: "asc"}, {createdAt: "asc"}],
     });
     if (transactions.length === 0) {
-        //Semua transaction dah dipadam - bersihkan snapshot obsolete
+        // All transactions deleted — clear obsolete snapshots
         await prisma.portfolioSnapshot.deleteMany({where: {portfolioId}});
         return 0;
     }
@@ -46,7 +46,7 @@ export async function rebuildSnapshots(portfolioId: string) {
         close: Number(r.rate),
     }));
 
-    // Siri harga per symbol + kalendar (union semua trading day)
+    // Price series per symbol + calendar (union of trading days)
     const priceMap = new Map<string, PricePoint[]>();
     const calendarSet = new Set<number>();
     for (const p of prices) {
@@ -70,7 +70,7 @@ export async function rebuildSnapshots(portfolioId: string) {
     const snapshots: {date: Date; totalValue: number; totalCost: number}[] = [];
 
     for (const time of calendar) {
-        //Apply semua transaksi sehingga tarikh ini
+        // All transactions up to this date
         while (txIndex < transactions.length && transactions[txIndex].date.getTime() <= time) {
             const t = transactions[txIndex];
             const q = Number(t.quantity);
@@ -117,7 +117,7 @@ export async function rebuildSnapshots(portfolioId: string) {
             totalCost += costBySymbol.get(symbol) ?? 0;
         }
 
-        //Kadar FX tiada untuk tarikh ini - jangan simpan nilai yang salah
+        // Skip this date when FX is missing — do not persist a wrong value
         if (!rateAvailable) continue;
         snapshots.push({date: new Date(time), totalValue, totalCost});
     }

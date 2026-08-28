@@ -16,7 +16,7 @@ export function HoldingsTable({ holdings, allocation, currency, isLoading }: Pro
   if (!holdings || holdings.length === 0) {
     return (
       <div className="rounded-xl bg-[var(--color-surface)] p-5 text-sm text-[var(--color-text-muted)]">
-        Tiada holding
+        No holdings
       </div>
     );
   }

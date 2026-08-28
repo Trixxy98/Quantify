@@ -49,11 +49,11 @@ export async function register(email: string, password: string, name: string) {
 export async function login(email: string, password: string) {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      throw new AppError(401, "INVALID_CREDENTIALS", "Email atau password salah");
+      throw new AppError(401, "INVALID_CREDENTIALS", "Incorrect email or password");
     }
     const isValid = await comparePassword(password, user.passwordHash);
     if (!isValid) {
-      throw new AppError(401, "INVALID_CREDENTIALS", "Email atau password salah");
+      throw new AppError(401, "INVALID_CREDENTIALS", "Incorrect email or password");
     }
     const tokens = await issueTokenPair(user.id);
     return { user: { id: user.id, email: user.email, name: user.name }, ...tokens };

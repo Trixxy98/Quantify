@@ -10,7 +10,7 @@ export function SyncButton() {
     const mutation = useMutation({
         mutationFn: syncMarketData,
         onSuccess: async () => {
-            setMessage("Sync successfully");
+            setMessage("Synced successfully");
             await queryClient.invalidateQueries({queryKey: ["portfolio"]});
             await queryClient.invalidateQueries({queryKey: ["portfolios"]});
         },

@@ -17,7 +17,7 @@ export function AllocationChart({ data, isLoading }: Props) {
   if (!data || data.items.length === 0) {
     return (
       <div className="h-72 rounded-xl bg-[var(--color-surface)] flex items-center justify-center text-sm text-[var(--color-text-muted)]">
-        Tiada holding untuk allocation
+        No holdings to chart
       </div>
     );
   }

@@ -9,6 +9,7 @@ import type {
   PortfolioPerformance,
   PortfolioSummary,
   Range,
+  TransactionListResponse,
 } from "../types/api.types";
 
 export async function createTransaction(portfolioId: string, input: CreateTransactionInput) {
@@ -61,4 +62,20 @@ export async function listHoldings(portfolioId: string): Promise<Holding[]> {
 export async function createPortfolio(name: string, baseCurrency: Currency = "MYR"): Promise<Portfolio> {
   const {data} = await apiClient.post<Portfolio>("/portfolios", {name, baseCurrency});
   return data;
+}
+
+export async function listTransactions(
+  portfolioId: string,
+  page = 1,
+  limit = 20
+): Promise<TransactionListResponse> {
+  const {data} = await apiClient.get<TransactionListResponse>(
+    `/portfolios/${portfolioId}/transactions`,
+    {params: {page, limit}}
+  );
+  return data;
+}
+
+export async function deleteTransaction(portfolioId: string, transactionId: string): Promise<void> {
+  await apiClient.delete(`/portfolios/${portfolioId}/transactions/${transactionId}`);
 }
