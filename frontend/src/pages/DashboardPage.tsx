@@ -16,6 +16,7 @@ import type { Range } from "../types/api.types";
 import { AddTransactionForm } from "../components/dashboard/AddTransactionForm";
 import { SyncButton } from "../components/dashboard/SyncButton";
 import {CreatePortfolioForm} from "../components/dashboard/CreatePortfolioForm";
+import { TransactionsTable } from "../components/dashboard/TransactionsTable";
 
 
 const RANGES: Range[] = ["1M", "3M", "6M", "1Y", "YTD", "ALL"];
@@ -56,7 +57,7 @@ const portfolioId = selectedId;
 
   const metricsHint = useMemo(() => {
     if (!metricsError) return undefined;
-    return "Data tidak cukup untuk julat ini — sync dulu atau pilih julat lebih panjang";
+    return "Not enough data for this range — sync first or pick a longer range";
   }, [metricsError]);
 
   return (
@@ -101,7 +102,7 @@ const portfolioId = selectedId;
             onClick={logout}
             className="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
           >
-            Log keluar
+            Log out
           </button>
           <SyncButton />
         </div>
@@ -179,6 +180,7 @@ const portfolioId = selectedId;
           isLoading={isHoldingsLoading}
         />
         {portfolioId && <AddTransactionForm portfolioId={portfolioId} />}
+        {portfolioId && <TransactionsTable portfolioId={portfolioId} />}
       </main>
     </div>
   );

@@ -7,7 +7,7 @@ function App() {
   if (!isReady) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-[var(--color-text-muted)]">Memuatkan...</p>
+        <p className="text-[var(--color-text-muted)]">Loading...</p>
       </div>
     );
   }

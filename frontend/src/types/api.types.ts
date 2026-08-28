@@ -78,3 +78,25 @@ export type CreateTransactionInput = {
     fee?: number;
     date: string;
 };
+
+export type Transaction = {
+    id: string;
+    portfolioId: string;
+    symbol: string;
+    type: TransactionType;
+    quantity: string;
+    price: string;
+    currency: Currency;
+    fee: string;
+    date: string;
+};
+
+export type TransactionListResponse = {
+    data: Transaction[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+    };
+};

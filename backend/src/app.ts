@@ -24,7 +24,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/portfolios", portfolioRouter);
 app.use("/api/sync", syncRouter);
 app.use((_req, res) => {
-  res.status(404).json({ error: { code: "NOT_FOUND", message: "Route tidak wujud" } });
+  res.status(404).json({ error: { code: "NOT_FOUND", message: "Route not found" } });
 });
 
 app.use(errorHandler);

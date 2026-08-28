@@ -41,8 +41,8 @@ export async function listHoldings(portfolioId: string, userId: string) {
     return prisma.holding.findMany({where: {portfolioId}, orderBy: {symbol: "asc"}});
 }
 
-// Replay semua transaction untuk symbol ini (ikut tarikh) dan kira semula
-// quantity + weighted average cost. Kalau baki jadi 0, holding dipadam.
+// Replay all transactions for this symbol (by date) and recompute
+// quantity + weighted average cost. Delete the holding when quantity hits 0.
 async function recomputeHolding(
     tx: Prisma.TransactionClient,
     portfolioId: string,

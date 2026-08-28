@@ -59,7 +59,7 @@ async function loadSnapshotSeries(portfolioId: string, range: Range): Promise<Da
     return snapshots.map((s) => ({date: toDateKey(s.date), value: Number(s.totalValue)}));
 }
 
-//Nilai pasaran semasa setiap holding, dalam baseCurrency
+// Current market value of each holding, in baseCurrency
 async function getHoldingValues(portfolioId: string, baseCurrency: Currency) {
     const holdings = await prisma.holding.findMany({where: {portfolioId}});
 
@@ -81,7 +81,7 @@ async function getHoldingValues(portfolioId: string, baseCurrency: Currency) {
         let marketValue = Number(holding.quantity) * Number(lastPrice.close);
 
         if (holding.currency !== baseCurrency) {
-            if (usdMyr == null) continue; //tiada kadar FX
+            if (usdMyr == null) continue; // no FX rate
             marketValue = holding.currency === Currency.USD ? marketValue * usdMyr : marketValue / usdMyr;
         }
 

@@ -2,7 +2,7 @@ import YahooFinance from "yahoo-finance2";
 import {Currency} from "@prisma/client";
 import {prisma} from "../lib/prisma";
 
-// v3: default export ialah class — perlu instantiate dulu
+// v3: default export is a class — instantiate first
 const yahooFinance = new YahooFinance();
 
 export const BENCHMARK_SYMBOLS = ["^KLSE", "^GSPC"];
@@ -12,8 +12,8 @@ export function currencyFromSymbol(symbol: string): Currency {
     return symbol.toUpperCase().endsWith(".KL") ? Currency.MYR : Currency.USD;
 }
 
-// Normalisasi ke UTC midnight — guna getter UTC supaya tarikh bar US
-// (tutup 20:00 UTC) tak "terlompat" ke hari esok bila server di timezone MYT
+// Normalize to UTC midnight — use UTC getters so US session close (20:00 UTC)
+// does not roll into the next calendar day on a MYT server
 function toUtcDate(d: Date): Date {
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }

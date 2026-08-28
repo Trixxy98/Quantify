@@ -4,7 +4,7 @@ node_modules/
 .pnp.js
 .yarn/install-state.gz
 
-# Environment variables (jangan sekali-kali push secrets)
+# Environment variables (never push secrets)
 .env
 .env.*
 !.env.example

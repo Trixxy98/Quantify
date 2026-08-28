@@ -13,7 +13,7 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return res.status(400).json({
       error: {
         code: "VALIDATION_ERROR",
-        message: "Input tidak sah",
+        message: "Invalid input",
         details: err.flatten().fieldErrors,
       },
     });
@@ -21,6 +21,6 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
 
   console.error(err);
   return res.status(500).json({
-    error: { code: "INTERNAL_ERROR", message: "Ralat server dalaman" },
+    error: { code: "INTERNAL_ERROR", message: "Internal server error" },
   });
 }

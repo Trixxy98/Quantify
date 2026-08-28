@@ -71,7 +71,7 @@ export function AddTransactionForm({portfolioId}: Props) {
 
     return (
         <form onSubmit={handleSubmit} className="rounded-xl bg-[var(--color-surface)] p-5 space-y-4">
-      <h2 className="text-sm text-[var(--color-text-muted)]">Tambah Transaction</h2>
+      <h2 className="text-sm text-[var(--color-text-muted)]">Add transaction</h2>
       {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
       {success && <p className="text-sm text-[var(--color-accent)]">{success}</p>}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
@@ -82,7 +82,7 @@ export function AddTransactionForm({portfolioId}: Props) {
           <input
             id="tx-symbol"
             required
-            placeholder="1155.KL atau AAPL"
+            placeholder="1155.KL or AAPL"
             value={symbol}
             onChange={(e) => setSymbol(e.target.value)}
             className={inputClass}
@@ -156,14 +156,14 @@ export function AddTransactionForm({portfolioId}: Props) {
         </div>
       </div>
       <p className="text-xs text-[var(--color-text-muted)]">
-        Currency automatik: `.KL` = MYR, selain itu = USD
+        Currency is inferred automatically: `.KL` = MYR, otherwise USD
       </p>
       <button
         type="submit"
         disabled={mutation.isPending}
         className="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-50"
       >
-        {mutation.isPending ? "Menyimpan..." : "Simpan"}
+        {mutation.isPending ? "Saving..." : "Save"}
       </button>
     </form>
     );

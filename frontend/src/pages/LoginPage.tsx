@@ -23,7 +23,7 @@ export default function LoginPage() {
       navigate("/dashboard");
     } catch (err) {
       const isUnauthorized = axios.isAxiosError(err) && err.response?.status === 401;
-      setError(isUnauthorized ? "Email atau password salah" : "Log masuk gagal. Cuba lagi.");
+      setError(isUnauthorized ? "Incorrect email or password" : "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -32,12 +32,12 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center">
       <form onSubmit={handleSubmit} className="w-full max-w-sm bg-[var(--color-surface)] p-8 rounded-xl space-y-4">
-        <h1 className="text-xl font-semibold text-center">Log Masuk Quantify</h1>
+        <h1 className="text-xl font-semibold text-center">Sign in to Quantify</h1>
 
         {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
 
         <div>
-          <label htmlFor="email"className="block text-sm text-[var(--color-text-muted)] mb-1">Email</label>
+          <label htmlFor="email" className="block text-sm text-[var(--color-text-muted)] mb-1">Email</label>
           <input
             id="email"
             type="email"
@@ -65,11 +65,11 @@ export default function LoginPage() {
           disabled={isLoading}
           className="w-full rounded-md bg-[var(--color-accent)] py-2 text-sm font-medium text-slate-900 disabled:opacity-50"
         >
-          {isLoading ? "Log masuk..." : "Log Masuk"}
+          {isLoading ? "Signing in..." : "Sign in"}
         </button>
 
         <p className="text-sm text-center text-[var(--color-text-muted)]">
-          Tiada akaun? <Link to="/register" className="text-[var(--color-accent)]">Daftar</Link>
+          No account? <Link to="/register" className="text-[var(--color-accent)]">Register</Link>
         </p>
       </form>
     </div>

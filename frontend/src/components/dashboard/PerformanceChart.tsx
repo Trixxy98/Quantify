@@ -23,7 +23,7 @@ import {
     if (!data || data.series.length < 2) {
       return (
         <div className="h-72 rounded-xl bg-[var(--color-surface)] flex items-center justify-center text-sm text-[var(--color-text-muted)]">
-          Tiada data performance untuk julat ini
+          No performance data for this range
         </div>
       );
     }
