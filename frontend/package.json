@@ -15,7 +15,6 @@
     "axios": "^1.19.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-gauge-component": "^2.0.29",
     "react-router-dom": "^7.18.2",
     "recharts": "^3.10.1",
     "tailwindcss": "^4.3.3",

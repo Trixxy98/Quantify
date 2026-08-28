@@ -19,7 +19,11 @@ export type Holding = {
     currency: Currency;
     quantity: string;
     avgCost: string;
-}
+    lastPrice: string | null;
+    marketValue: number | null;
+    unrealizedPnL: number | null;
+    unrealizedPnLPct: number | null;
+};
 
 export type PortfolioSummary = {
     portfolioId: string;
@@ -74,6 +78,12 @@ export type HoldingPriceSeries = {
     currency: Currency;
     range: Range;
     series: PricePoint[];
+};
+
+export type SymbolSearchHit = {
+    symbol: string;
+    name: string;
+    exchange: string;
 };
 
 export type TransactionType = "BUY" | "SELL";

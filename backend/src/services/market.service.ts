@@ -105,5 +105,79 @@ export async function syncMarketData(daysBack = 400) {
     }
     await syncUsdMyrRate(from);
     return { symbols: symbols.length, benchmarks: BENCHMARK_SYMBOLS.length };
-  }
+}
+
+const SEARCHABLE_TYPES = new Set(["EQUITY", "ETF"]);
+
+function isAppMarketSymbol(symbol: string): boolean {
+    const s = symbol.toUpperCase();
+    return s.endsWith(".KL") || !s.includes(".");
+}
+
+export type SymbolSearchHit = {
+    symbol: string;
+    name: string;
+    exchange: string;
+};
+
+export async function searchSymbols(query: string): Promise<SymbolSearchHit[]> {
+    const q = query.trim();
+    if (q.length < 2) return [];
+
+    const result = await yahooFinance.search(q, {quotesCount: 25, newsCount: 0});
+    const hits: SymbolSearchHit[] = [];
+
+    for (const quote of result.quotes) {
+        if (!("isYahooFinance" in quote) || !quote.isYahooFinance) continue;
+        if (!("quoteType" in quote) || !SEARCHABLE_TYPES.has(quote.quoteType)) continue;
+        if (!quote.symbol || !isAppMarketSymbol(quote.symbol)) continue;
+
+        hits.push({
+            symbol: quote.symbol.toUpperCase(),
+            name: quote.shortname ?? quote.longname ?? quote.symbol,
+            exchange: quote.exchDisp ?? quote.exchange,
+        });
+    }
+
+    return hits;
+}
+
+export type MarketClose = {
+    symbol: string;
+    date: string;
+    close: number;
+    currency: Currency;
+};
+
+export async function getCloseOnOrBefore(symbol: string, onDate: Date): Promise<MarketClose | null> {
+    const ticker = symbol.trim().toUpperCase();
+    const target = toUtcDate(onDate);
+
+    async function lookup() {
+        return prisma.dailyPrice.findFirst({
+            where: {symbol: ticker, date: {lte: target}},
+            orderBy: {date: "desc"},
+        });
+    }
+
+    let row = await lookup();
+    if (!row) {
+        const from = new Date(target.getTime() - 45 * 24 * 60 * 60 * 1000);
+        try {
+            await syncDailyPrices(ticker, from);
+        } catch (err) {
+            console.error("[close] Yahoo fetch failed", ticker, err);
+            return null;
+        }
+        row = await lookup();
+    }
+    if (!row) return null;
+
+    return {
+        symbol: ticker,
+        date: row.date.toISOString().slice(0, 10),
+        close: Number(row.close),
+        currency: row.currency,
+    };
+}
   
