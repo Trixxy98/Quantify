@@ -2,10 +2,12 @@ import { apiClient } from "./client";
 import type {
   CreateTransactionInput,
   Currency,
+  UpdateTransactionInput,
   Holding,
   HoldingPriceSeries,
   Portfolio,
   PortfolioAllocation,
+  PortfolioAnalysis,
   PortfolioMetrics,
   PortfolioPerformance,
   PortfolioSummary,
@@ -55,6 +57,13 @@ export async function getPortfolioAllocation(portfolioId: string): Promise<Portf
   return data;
 }
 
+export async function getPortfolioAnalysis(portfolioId: string, range: Range): Promise<PortfolioAnalysis> {
+  const { data } = await apiClient.get<PortfolioAnalysis>(`/portfolios/${portfolioId}/analysis`, {
+    params: { range },
+  });
+  return data;
+}
+
 export async function listHoldings(portfolioId: string): Promise<Holding[]> {
   const { data } = await apiClient.get<Holding[]>(`/portfolios/${portfolioId}/holdings`);
   return data;
@@ -98,6 +107,15 @@ export async function listTransactions(
     `/portfolios/${portfolioId}/transactions`,
     {params: {page, limit}}
   );
+  return data;
+}
+
+export async function updateTransaction(
+  portfolioId: string,
+  transactionId: string,
+  input: UpdateTransactionInput
+) {
+  const {data} = await apiClient.patch(`/portfolios/${portfolioId}/transactions/${transactionId}`, input);
   return data;
 }
 

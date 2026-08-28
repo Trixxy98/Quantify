@@ -157,6 +157,9 @@ export function AppShell() {
               <NavLink to="/dashboard" className={navClass}>
                 Overview
               </NavLink>
+              <NavLink to="/analysis" className={navClass}>
+                Analysis
+              </NavLink>
               <NavLink to="/holdings" className={navClass}>
                 Holdings
               </NavLink>
@@ -180,6 +183,9 @@ export function AppShell() {
         <nav className="mx-auto flex max-w-7xl gap-4 px-6 pb-3 sm:hidden">
           <NavLink to="/dashboard" className={navClass}>
             Overview
+          </NavLink>
+          <NavLink to="/analysis" className={navClass}>
+            Analysis
           </NavLink>
           <NavLink to="/holdings" className={navClass}>
             Holdings

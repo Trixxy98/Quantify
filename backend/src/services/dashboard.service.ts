@@ -16,40 +16,13 @@ import {
 } from "./metrics.service";
 import {currencyFromSymbol} from "./market.service";
 import {getOwnedPortfolio} from "./portfolio.service";
+import {markOpenPositions} from "./valuation.service";
+import {type Range, resolveRangeStart, toDateKey} from "../utils/dateRange";
+
+export type {Range};
 
 const BURSA_BENCHMARK = "^KLSE";
 const US_BENCHMARK = "^GSPC";
-
-export type Range = "1M" | "3M" | "6M" | "1Y" | "YTD" | "ALL";
-
-function addUtcMonths(date: Date, months: number): Date {
-    const year = date.getUTCFullYear();
-    const month = date.getUTCMonth();
-    const day = date.getUTCDate();
-    const rawMonth = month + months;
-    const targetYear = year + Math.floor(rawMonth / 12);
-    const targetMonth = ((rawMonth % 12) + 12) % 12;
-    const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-    return new Date(Date.UTC(targetYear, targetMonth, Math.min(day, lastDay)));
-}
-
-function resolveRangeStart(range: Range): Date | null {
-    const now = new Date();
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-
-    switch (range) {
-        case "1M": return addUtcMonths(d, -1);
-        case "3M": return addUtcMonths(d, -3);
-        case "6M": return addUtcMonths(d, -6);
-        case "1Y": d.setUTCFullYear(d.getUTCFullYear() - 1); return d;
-        case "YTD": return new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
-        case "ALL": return null;
-    }
-}
-
-function toDateKey(date: Date): string {
-    return date.toISOString().slice(0, 10);
-}
 
 async function loadSnapshotSeries(portfolioId: string, range: Range): Promise<DailyValue[]> {
     const start = resolveRangeStart(range);
@@ -60,46 +33,15 @@ async function loadSnapshotSeries(portfolioId: string, range: Range): Promise<Da
     return snapshots.map((s) => ({date: toDateKey(s.date), value: Number(s.totalValue)}));
 }
 
-// Current market value of each holding, in baseCurrency
-async function getHoldingValues(portfolioId: string, baseCurrency: Currency) {
-    const holdings = await prisma.holding.findMany({where: {portfolioId}});
-
-    const latestFx = await prisma.exchangeRate.findFirst({
-        where: {from: Currency.USD, to: Currency.MYR},
-        orderBy: {date: "desc"},
-    });
-    const usdMyr = latestFx ? Number(latestFx.rate) : null;
-
-    const values: {symbol: string; exchange: Exchange; marketValue: number }[] = [];
-    
-    for (const holding of holdings) {
-        const lastPrice = await prisma.dailyPrice.findFirst({
-            where: {symbol: holding.symbol},
-            orderBy: {date: "desc"},
-        });
-        if (!lastPrice) continue;
-
-        let marketValue = Number(holding.quantity) * Number(lastPrice.close);
-
-        if (holding.currency !== baseCurrency) {
-            if (usdMyr == null) continue; // no FX rate
-            marketValue = holding.currency === Currency.USD ? marketValue * usdMyr : marketValue / usdMyr;
-        }
-
-        values.push({symbol: holding.symbol, exchange: holding.exchange, marketValue});
-    }
-
-    return values;
-}
-
 async function getBenchmarkWeights(portfolioId: string, baseCurrency: Currency) {
-    const values = await getHoldingValues(portfolioId, baseCurrency);
-    const total = values.reduce((sum, v) => sum + v.marketValue, 0);
+    const values = await markOpenPositions(portfolioId, baseCurrency);
+    const priced = values.filter((v) => v.marketValue != null);
+    const total = priced.reduce((sum, v) => sum + v.marketValue!, 0);
     if (total === 0) return {bursa: 1, us: 0};
 
-    const bursa = values
+    const bursa = priced
         .filter((v) => v.exchange === Exchange.BURSA)
-        .reduce((sum, v) => sum + v.marketValue, 0) / total;
+        .reduce((sum, v) => sum + v.marketValue!, 0) / total;
 
     return {bursa, us: 1 - bursa};
 }
@@ -146,35 +88,62 @@ async function loadAlignedBenchmark(
 
 export async function getSummary(portfolioId: string, userId: string) {
     const portfolio = await getOwnedPortfolio(portfolioId, userId);
+    const marks = await markOpenPositions(portfolioId, portfolio.baseCurrency);
+    const priced = marks.filter((m) => m.marketValue != null);
 
-    const latest = await prisma.portfolioSnapshot.findMany({
+    const snapshots = await prisma.portfolioSnapshot.findMany({
         where: {portfolioId},
         orderBy: {date: "desc"},
-        take: 2,
+        take: 8,
     });
 
-    if (latest.length === 0) {
+    if (priced.length === 0) {
+        const current = snapshots[0];
+        if (!current) {
+            return {
+                portfolioId,
+                name: portfolio.name,
+                baseCurrency: portfolio.baseCurrency,
+                totalValue: 0,
+                totalCost: 0,
+                unrealizedPnL: 0,
+                unrealizedPnLPct: 0,
+                todayReturnPct: 0,
+                todayReturnValue: 0,
+                asOfDate: null,
+            };
+        }
+        const totalValue = Number(current.totalValue);
+        const totalCost = Number(current.totalCost);
+        const prevValue = snapshots[1] ? Number(snapshots[1].totalValue) : totalValue;
         return {
             portfolioId,
             name: portfolio.name,
             baseCurrency: portfolio.baseCurrency,
-            totalValue: 0,
-            totalCost: 0,
-            unrealizedPnL: 0,
-            unrealizedPnLPct: 0,
-            todayReturnPct: 0,
-            todayReturnValue: 0,
-            asOfDate: null,
+            totalValue,
+            totalCost,
+            unrealizedPnL: totalValue - totalCost,
+            unrealizedPnLPct: totalCost > 0 ? (totalValue - totalCost) / totalCost : 0,
+            todayReturnPct: prevValue > 0 ? (totalValue - prevValue) / prevValue : 0,
+            todayReturnValue: totalValue - prevValue,
+            asOfDate: toDateKey(current.date),
         };
     }
 
-    const current = latest[0];
-    const totalValue = Number(current.totalValue);
-    const totalCost = Number(current.totalCost);
-    const prevValue = latest[1] ? Number(latest[1].totalValue) : totalValue;
+    const totalValue = priced.reduce((sum, m) => sum + m.marketValue!, 0);
+    const totalCost = priced.reduce((sum, m) => sum + m.baseCost, 0);
+    const asOfDate = priced.reduce<string | null>((max, m) => {
+        if (!m.lastPriceDate) return max;
+        const key = toDateKey(m.lastPriceDate);
+        return !max || key > max ? key : max;
+    }, null);
+
+    const asOfTime = asOfDate ? Date.parse(`${asOfDate}T00:00:00.000Z`) : NaN;
+    const prev = snapshots.find((s) => (Number.isNaN(asOfTime) ? true : s.date.getTime() < asOfTime));
+    const prevValue = prev ? Number(prev.totalValue) : totalValue;
 
     return {
-        portfolioId, 
+        portfolioId,
         name: portfolio.name,
         baseCurrency: portfolio.baseCurrency,
         totalValue,
@@ -183,7 +152,7 @@ export async function getSummary(portfolioId: string, userId: string) {
         unrealizedPnLPct: totalCost > 0 ? (totalValue - totalCost) / totalCost : 0,
         todayReturnPct: prevValue > 0 ? (totalValue - prevValue) / prevValue : 0,
         todayReturnValue: totalValue - prevValue,
-        asOfDate: toDateKey(current.date),
+        asOfDate,
     };
 }
 
@@ -269,16 +238,17 @@ export async function getPerformance(portfolioId: string, userId: string, range:
 
 export async function getAllocation(portfolioId: string, userId: string) {
     const portfolio = await getOwnedPortfolio(portfolioId, userId);
-    const values = await getHoldingValues(portfolioId, portfolio.baseCurrency);
-    const totalValue = values.reduce((sum, v) => sum + v.marketValue, 0);
+    const marks = await markOpenPositions(portfolioId, portfolio.baseCurrency);
+    const priced = marks.filter((m) => m.marketValue != null);
+    const totalValue = priced.reduce((sum, m) => sum + m.marketValue!, 0);
     return {
         totalValue,
-        items: values
-            .map((v) => ({
-                symbol: v.symbol,
-                exchange: v.exchange,
-                marketValue: v.marketValue,
-                percentage: totalValue > 0 ? v.marketValue / totalValue : 0,
+        items: priced
+            .map((m) => ({
+                symbol: m.symbol,
+                exchange: m.exchange,
+                marketValue: m.marketValue!,
+                percentage: totalValue > 0 ? m.marketValue! / totalValue : 0,
             }))
             .sort((a, b) => b.marketValue - a.marketValue),
     };

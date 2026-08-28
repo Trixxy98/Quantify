@@ -1,6 +1,7 @@
 import {Request, Response} from "express";
 import * as portfolioService from "../services/portfolio.service";
 import * as dashboardService from "../services/dashboard.service";
+import * as analysisService from "../services/analysis.service";
 import { listTransactionsQuerySchema, rangeQuerySchema } from "../validators/portfolio.validator";
 
 export async function listPortfoliosHandler(req: Request, res: Response) {
@@ -44,6 +45,16 @@ export async function listTransactionsHandler(req: Request, res: Response) {
     const transaction = await portfolioService.createTransaction(req.params.id, req.userId!, req.body);
     res.status(201).json(transaction);
   }
+
+  export async function updateTransactionHandler(req: Request, res: Response) {
+    const transaction = await portfolioService.updateTransaction(
+      req.params.id,
+      req.params.txId,
+      req.userId!,
+      req.body
+    );
+    res.json(transaction);
+  }
   
   export async function deleteTransactionHandler(req: Request, res: Response) {
     await portfolioService.deleteTransaction(req.params.id, req.params.txId, req.userId!);
@@ -69,6 +80,12 @@ export async function getPerformanceHandler(req: Request, res: Response) {
 
 export async function getAllocationHandler(req: Request, res: Response) {
     const result = await dashboardService.getAllocation(req.params.id, req.userId!);
+    res.json(result);
+}
+
+export async function getAnalysisHandler(req: Request, res: Response) {
+    const {range} = rangeQuerySchema.parse(req.query);
+    const result = await analysisService.getAnalysis(req.params.id, req.userId!, range);
     res.json(result);
 }
 
