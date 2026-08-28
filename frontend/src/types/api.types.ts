@@ -67,6 +67,15 @@ export type PortfolioAllocation = {
     items: AllocationItem[];
 };
 
+export type PricePoint = {date: string; close: number};
+
+export type HoldingPriceSeries = {
+    symbol: string;
+    currency: Currency;
+    range: Range;
+    series: PricePoint[];
+};
+
 export type TransactionType = "BUY" | "SELL";
 
 export type CreateTransactionInput = {

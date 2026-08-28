@@ -14,6 +14,7 @@ import {
     toDailyReturns,
     volatility,
 } from "./metrics.service";
+import {currencyFromSymbol} from "./market.service";
 import {getOwnedPortfolio} from "./portfolio.service";
 
 const BURSA_BENCHMARK = "^KLSE";
@@ -280,6 +281,36 @@ export async function getAllocation(portfolioId: string, userId: string) {
                 percentage: totalValue > 0 ? v.marketValue / totalValue : 0,
             }))
             .sort((a, b) => b.marketValue - a.marketValue),
+    };
+}
+
+export async function getPriceSeries(
+    portfolioId: string,
+    userId: string,
+    rawSymbol: string,
+    range: Range
+) {
+    await getOwnedPortfolio(portfolioId, userId);
+    const symbol = rawSymbol.toUpperCase();
+
+    const inPortfolio =
+        (await prisma.holding.findFirst({where: {portfolioId, symbol}})) ??
+        (await prisma.transaction.findFirst({where: {portfolioId, symbol}}));
+    if (!inPortfolio) {
+        throw new AppError(404, "NOT_FOUND", "Symbol not found in this portfolio");
+    }
+
+    const start = resolveRangeStart(range);
+    const prices = await prisma.dailyPrice.findMany({
+        where: {symbol, ...(start ? {date: {gte: start}} : {})},
+        orderBy: {date: "asc"},
+    });
+
+    return {
+        symbol,
+        currency: prices[0] ? prices[0].currency : currencyFromSymbol(symbol),
+        range,
+        series: prices.map((p) => ({date: toDateKey(p.date), close: Number(p.close)})),
     };
 }
 
