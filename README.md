@@ -4,6 +4,8 @@ Personal portfolio analytics for **Bursa Malaysia** and **US** stocks. Not a bro
 
 You enter BUY/SELL trades. Quantify rebuilds holdings, pulls Yahoo Finance prices, and shows P&L, risk metrics, attribution, and simple market scenarios in **MYR or USD**.
 
+<img width="1387" height="912" alt="image" src="https://github.com/user-attachments/assets/62fabd35-52b0-4afc-ab27-57c84cdce9f5" />
+
 ## Stack
 
 | Layer | Tech |
