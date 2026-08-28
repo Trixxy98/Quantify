@@ -1,6 +1,7 @@
 import {Request, Response} from "express";
 import * as portfolioService from "../services/portfolio.service";
 import * as dashboardService from "../services/dashboard.service";
+import * as analysisService from "../services/analysis.service";
 import { listTransactionsQuerySchema, rangeQuerySchema } from "../validators/portfolio.validator";
 
 export async function listPortfoliosHandler(req: Request, res: Response) {
@@ -79,6 +80,12 @@ export async function getPerformanceHandler(req: Request, res: Response) {
 
 export async function getAllocationHandler(req: Request, res: Response) {
     const result = await dashboardService.getAllocation(req.params.id, req.userId!);
+    res.json(result);
+}
+
+export async function getAnalysisHandler(req: Request, res: Response) {
+    const {range} = rangeQuerySchema.parse(req.query);
+    const result = await analysisService.getAnalysis(req.params.id, req.userId!, range);
     res.json(result);
 }
 

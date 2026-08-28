@@ -71,6 +71,44 @@ export type PortfolioAllocation = {
     items: AllocationItem[];
 };
 
+export type AttributionItem = {
+    symbol: string;
+    exchange: Exchange;
+    currency: Currency;
+    marketValue: number | null;
+    weight: number;
+    contribution: number;
+    contributionShare: number;
+    stockContribution: number;
+    fxContribution: number;
+    riskShare: number;
+    beta: number;
+};
+
+export type ScenarioPosition = {
+    symbol: string;
+    exchange: Exchange;
+    marketValue: number;
+    beta: number;
+    fxSensitivity: number;
+};
+
+export type PortfolioAnalysis = {
+    range: Range;
+    asOf: string | null;
+    baseCurrency: Currency;
+    days: number;
+    totalValue: number;
+    totalContribution: number;
+    stockContribution: number;
+    fxContribution: number;
+    items: AttributionItem[];
+    scenario: {
+        totalValue: number;
+        positions: ScenarioPosition[];
+    };
+};
+
 export type PricePoint = {date: string; close: number};
 
 export type HoldingPriceSeries = {

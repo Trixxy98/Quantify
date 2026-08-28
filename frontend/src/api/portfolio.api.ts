@@ -7,6 +7,7 @@ import type {
   HoldingPriceSeries,
   Portfolio,
   PortfolioAllocation,
+  PortfolioAnalysis,
   PortfolioMetrics,
   PortfolioPerformance,
   PortfolioSummary,
@@ -53,6 +54,13 @@ export async function getPortfolioPerformance(
 
 export async function getPortfolioAllocation(portfolioId: string): Promise<PortfolioAllocation> {
   const { data } = await apiClient.get<PortfolioAllocation>(`/portfolios/${portfolioId}/allocation`);
+  return data;
+}
+
+export async function getPortfolioAnalysis(portfolioId: string, range: Range): Promise<PortfolioAnalysis> {
+  const { data } = await apiClient.get<PortfolioAnalysis>(`/portfolios/${portfolioId}/analysis`, {
+    params: { range },
+  });
   return data;
 }
 
