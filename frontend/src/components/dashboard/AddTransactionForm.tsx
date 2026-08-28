@@ -67,8 +67,8 @@ export function AddTransactionForm({portfolioId, editing = null, onCancelEdit}: 
         onSuccess: async () => {
             setError(null);
             setSuccess(editing
-                ? "Transaction updated. Holdings were recalculated. Press Sync to refresh charts."
-                : "Transaction added successfully. Press Sync to update portfolio data.");
+                ? "Transaction updated. Holdings and charts were refreshed."
+                : "Transaction saved. Holdings and charts were refreshed.");
             if (!editing) {
                 setSymbol("");
                 setPrice("");
@@ -212,7 +212,7 @@ export function AddTransactionForm({portfolioId, editing = null, onCancelEdit}: 
           disabled={mutation.isPending}
           className="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-50"
         >
-          {mutation.isPending ? "Saving..." : editing ? "Update" : "Save"}
+          {mutation.isPending ? "Updating portfolio..." : editing ? "Update" : "Save"}
         </button>
         {editing && (
           <button

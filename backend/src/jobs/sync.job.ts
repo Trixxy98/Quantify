@@ -5,6 +5,10 @@ import {AppError} from "../utils/AppError";
 
 let isSyncRunning = false;
 
+export function isFullSyncRunning() {
+    return isSyncRunning;
+}
+
 export async function runFullSync(daysBack = 400) {
     if (isSyncRunning) {
         throw new AppError(409, "SYNC_IN_PROGRESS", "Sync is already running, try again later");

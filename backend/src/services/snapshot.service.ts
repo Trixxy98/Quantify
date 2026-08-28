@@ -1,23 +1,12 @@
-import {Currency, TransactionType} from "@prisma/client";
+import {TransactionType} from "@prisma/client";
 import {prisma} from "../lib/prisma";
 import {currencyFromSymbol} from "./market.service";
-
-type PricePoint = {date: number, close: number};
-
-// Last close on or before `time` — forward-fill for market holidays
-// (e.g. Bursa closed while US is open)
-function latestCloseAtOrBefore(series: PricePoint[], time: number): number | null {
-    let result: number | null = null;
-    for (const point of series) {
-        if (point.date > time) break;
-        result = point.close;
-    }
-    return result;
-}
+import {latestAtOrBefore, loadUsdMyrSeries, toBase as convertToBase, type SeriesPoint} from "./fx";
 
 export async function rebuildSnapshots(portfolioId: string) {
     const portfolio = await prisma.portfolio.findUnique({where: {id: portfolioId}});
     if (!portfolio) return 0;
+    const baseCurrency = portfolio.baseCurrency;
 
     const transactions = await prisma.transaction.findMany({
         where: {portfolioId},
@@ -37,17 +26,10 @@ export async function rebuildSnapshots(portfolioId: string) {
         orderBy: {date: "asc"},
     });
 
-    const rates = await prisma.exchangeRate.findMany({
-        where: {from: Currency.USD, to: Currency.MYR},
-        orderBy: {date: "asc"},
-    });
-    const rateSeries: PricePoint[] = rates.map((r) => ({
-        date: r.date.getTime(),
-        close: Number(r.rate),
-    }));
+    const rateSeries = await loadUsdMyrSeries();
 
     // Price series per symbol + calendar (union of trading days)
-    const priceMap = new Map<string, PricePoint[]>();
+    const priceMap = new Map<string, SeriesPoint[]>();
     const calendarSet = new Set<number>();
     for (const p of prices) {
         const time = p.date.getTime();
@@ -57,11 +39,8 @@ export async function rebuildSnapshots(portfolioId: string) {
     }
     const calendar = [...calendarSet].sort((a,b) => a-b);
 
-    function toBase(value: number, currency: Currency, time: number): number | null{
-        if (currency === portfolio!.baseCurrency) return value;
-        const rate = latestCloseAtOrBefore(rateSeries, time);
-        if (rate == null) return null;
-        return currency === Currency.USD ? value * rate : value / rate;
+    function toBase(value: number, currency: typeof baseCurrency, time: number) {
+        return convertToBase(value, currency, baseCurrency, rateSeries, time);
     }
 
     const qtyBySymbol = new Map<string, number>();
@@ -103,7 +82,7 @@ export async function rebuildSnapshots(portfolioId: string) {
             const quantity = qtyBySymbol.get(symbol) ?? 0;
             if (quantity <= 0) continue;
 
-            const close = latestCloseAtOrBefore(priceMap.get(symbol) ?? [], time);
+            const close = latestAtOrBefore(priceMap.get(symbol) ?? [], time);
             if (close == null) continue;
 
             const currency = currencyFromSymbol(symbol);

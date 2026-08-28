@@ -1,6 +1,8 @@
 import {Currency, Exchange, Prisma, TransactionType} from "@prisma/client";
 import {prisma} from "../lib/prisma";
 import {AppError} from "../utils/AppError";
+import {refreshPortfolioAfterTradeQuietly} from "./refresh.service";
+import {markOpenPositions} from "./valuation.service";
 
 function exchangeFromSymbol(symbol: string): Exchange {
     return symbol.toUpperCase().endsWith(".KL") ? Exchange.BURSA : Exchange.US;
@@ -36,62 +38,22 @@ export async function deletePortfolio(portfolioId: string, userId: string) {
     await prisma.portfolio.delete({where: {id: portfolioId}});
 }
 
-function toBaseCurrency(
-    amount: number,
-    from: Currency,
-    base: Currency,
-    usdMyr: number | null
-): number | null {
-    if (from === base) return amount;
-    if (usdMyr == null) return null;
-    return from === Currency.USD ? amount * usdMyr : amount / usdMyr;
-}
-
 export async function listHoldings(portfolioId: string, userId: string) {
     const portfolio = await getOwnedPortfolio(portfolioId, userId);
     const holdings = await prisma.holding.findMany({where: {portfolioId}, orderBy: {symbol: "asc"}});
+    const marks = await markOpenPositions(portfolioId, portfolio.baseCurrency);
+    const bySymbol = new Map(marks.map((m) => [m.symbol, m]));
 
-    const latestFx = await prisma.exchangeRate.findFirst({
-        where: {from: Currency.USD, to: Currency.MYR},
-        orderBy: {date: "desc"},
-    });
-    const usdMyr = latestFx ? Number(latestFx.rate) : null;
-
-    const rows = [];
-    for (const holding of holdings) {
-        const lastPrice = await prisma.dailyPrice.findFirst({
-            where: {symbol: holding.symbol},
-            orderBy: {date: "desc"},
-        });
-
-        let marketValue: number | null = null;
-        let unrealizedPnL: number | null = null;
-        let unrealizedPnLPct: number | null = null;
-
-        if (lastPrice) {
-            const quantity = Number(holding.quantity);
-            const avgCost = Number(holding.avgCost);
-            const close = Number(lastPrice.close);
-            const nativeValue = quantity * close;
-            const nativeCost = quantity * avgCost;
-            marketValue = toBaseCurrency(nativeValue, holding.currency, portfolio.baseCurrency, usdMyr);
-            const costBasis = toBaseCurrency(nativeCost, holding.currency, portfolio.baseCurrency, usdMyr);
-            if (marketValue != null && costBasis != null) {
-                unrealizedPnL = marketValue - costBasis;
-                unrealizedPnLPct = costBasis > 0 ? unrealizedPnL / costBasis : 0;
-            }
-        }
-
-        rows.push({
+    return holdings.map((holding) => {
+        const mark = bySymbol.get(holding.symbol);
+        return {
             ...holding,
-            lastPrice: lastPrice ? lastPrice.close.toString() : null,
-            marketValue,
-            unrealizedPnL,
-            unrealizedPnLPct,
-        });
-    }
-
-    return rows;
+            lastPrice: mark?.lastPrice != null ? String(mark.lastPrice) : null,
+            marketValue: mark?.marketValue ?? null,
+            unrealizedPnL: mark?.unrealizedPnL ?? null,
+            unrealizedPnLPct: mark?.unrealizedPnLPct ?? null,
+        };
+    });
 }
 
 // Replay all transactions for this symbol (by date) and recompute
@@ -163,11 +125,14 @@ export async function createTransaction(
     const symbol = input.symbol.toUpperCase();
     const payload = { ...input, symbol };
 
-    return prisma.$transaction(async (tx) => {
-        const transaction = await tx.transaction.create({data: {portfolioId, ...payload}});
+    const transaction = await prisma.$transaction(async (tx) => {
+        const created = await tx.transaction.create({data: {portfolioId, ...payload}});
         await recomputeHolding(tx, portfolioId, symbol, payload.currency);
-        return transaction;
+        return created;
     });
+
+    await refreshPortfolioAfterTradeQuietly(portfolioId, [symbol]);
+    return transaction;
 }
 
 export async function updateTransaction(
@@ -188,7 +153,7 @@ export async function updateTransaction(
 
     const symbol = input.symbol.toUpperCase();
 
-    return prisma.$transaction(async (tx) => {
+    const transaction = await prisma.$transaction(async (tx) => {
         const existing = await tx.transaction.findUnique({where: {id: transactionId}});
         if (!existing || existing.portfolioId !== portfolioId) {
             throw new AppError(404, "NOT_FOUND", "Transaction not found");
@@ -197,7 +162,7 @@ export async function updateTransaction(
         const previousSymbol = existing.symbol;
         const previousCurrency = existing.currency;
 
-        const transaction = await tx.transaction.update({
+        const updated = await tx.transaction.update({
             where: {id: transactionId},
             data: {
                 symbol,
@@ -220,14 +185,17 @@ export async function updateTransaction(
             await recomputeHolding(tx, portfolioId, symbol, input.currency);
         }
 
-        return transaction;
+        return {updated, previousSymbol};
     });
+
+    await refreshPortfolioAfterTradeQuietly(portfolioId, [transaction.previousSymbol, symbol]);
+    return transaction.updated;
 }
 
 export async function deleteTransaction(portfolioId: string, transactionId: string, userId: string) {
     await getOwnedPortfolio(portfolioId, userId);
 
-    await prisma.$transaction(async (tx) => {
+    const symbol = await prisma.$transaction(async (tx) => {
         const existing = await tx.transaction.findUnique({where: {id: transactionId}});
         if (!existing || existing.portfolioId !== portfolioId) {
             throw new AppError(404, "NOT_FOUND", "Transaction not found");
@@ -235,7 +203,10 @@ export async function deleteTransaction(portfolioId: string, transactionId: stri
 
         await tx.transaction.delete({where: {id: transactionId}});
         await recomputeHolding(tx, portfolioId, existing.symbol, existing.currency);
+        return existing.symbol;
     });
+
+    await refreshPortfolioAfterTradeQuietly(portfolioId, [symbol]);
 }
 
 export async function listTransactions(
