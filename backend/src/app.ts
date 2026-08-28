@@ -8,6 +8,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import { authRouter } from "./routes/auth.routes";
 import { portfolioRouter } from "./routes/portfolio.routes";
 import { syncRouter } from "./routes/sync.routes";
+import { marketRouter } from "./routes/market.routes";
 
 export const app = express();
 
@@ -23,6 +24,7 @@ app.get("/health", (_req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/portfolios", portfolioRouter);
 app.use("/api/sync", syncRouter);
+app.use("/api/market", marketRouter);
 app.use((_req, res) => {
   res.status(404).json({ error: { code: "NOT_FOUND", message: "Route not found" } });
 });

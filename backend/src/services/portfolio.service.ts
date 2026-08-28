@@ -36,9 +36,62 @@ export async function deletePortfolio(portfolioId: string, userId: string) {
     await prisma.portfolio.delete({where: {id: portfolioId}});
 }
 
+function toBaseCurrency(
+    amount: number,
+    from: Currency,
+    base: Currency,
+    usdMyr: number | null
+): number | null {
+    if (from === base) return amount;
+    if (usdMyr == null) return null;
+    return from === Currency.USD ? amount * usdMyr : amount / usdMyr;
+}
+
 export async function listHoldings(portfolioId: string, userId: string) {
-    await getOwnedPortfolio(portfolioId, userId);
-    return prisma.holding.findMany({where: {portfolioId}, orderBy: {symbol: "asc"}});
+    const portfolio = await getOwnedPortfolio(portfolioId, userId);
+    const holdings = await prisma.holding.findMany({where: {portfolioId}, orderBy: {symbol: "asc"}});
+
+    const latestFx = await prisma.exchangeRate.findFirst({
+        where: {from: Currency.USD, to: Currency.MYR},
+        orderBy: {date: "desc"},
+    });
+    const usdMyr = latestFx ? Number(latestFx.rate) : null;
+
+    const rows = [];
+    for (const holding of holdings) {
+        const lastPrice = await prisma.dailyPrice.findFirst({
+            where: {symbol: holding.symbol},
+            orderBy: {date: "desc"},
+        });
+
+        let marketValue: number | null = null;
+        let unrealizedPnL: number | null = null;
+        let unrealizedPnLPct: number | null = null;
+
+        if (lastPrice) {
+            const quantity = Number(holding.quantity);
+            const avgCost = Number(holding.avgCost);
+            const close = Number(lastPrice.close);
+            const nativeValue = quantity * close;
+            const nativeCost = quantity * avgCost;
+            marketValue = toBaseCurrency(nativeValue, holding.currency, portfolio.baseCurrency, usdMyr);
+            const costBasis = toBaseCurrency(nativeCost, holding.currency, portfolio.baseCurrency, usdMyr);
+            if (marketValue != null && costBasis != null) {
+                unrealizedPnL = marketValue - costBasis;
+                unrealizedPnLPct = costBasis > 0 ? unrealizedPnL / costBasis : 0;
+            }
+        }
+
+        rows.push({
+            ...holding,
+            lastPrice: lastPrice ? lastPrice.close.toString() : null,
+            marketValue,
+            unrealizedPnL,
+            unrealizedPnLPct,
+        });
+    }
+
+    return rows;
 }
 
 // Replay all transactions for this symbol (by date) and recompute

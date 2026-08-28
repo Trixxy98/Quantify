@@ -1,7 +1,10 @@
-import {useState, type FormEvent} from "react";
+import {useEffect, useState, type FormEvent} from "react";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import axios from "axios";
 import {createTransaction} from "../../api/portfolio.api";
+import {useHoldings} from "../../hooks/useHoldings";
+import {useMarketClose} from "../../hooks/useMarketClose";
+import {SymbolSearchField} from "./SymbolSearchField";
 import type {Currency, TransactionType} from "../../types/api.types";
 
 type Props = {
@@ -14,10 +17,12 @@ function currencyFromSymbol(symbol: string): Currency {
 
 export function AddTransactionForm({portfolioId}: Props) {
     const queryClient = useQueryClient();
+    const {data: holdings} = useHoldings(portfolioId);
     const [symbol, setSymbol] = useState("");
     const [type, setType] = useState<TransactionType>("BUY");
     const [quantity, setQuantity] = useState("1");
     const [price, setPrice] = useState("");
+    const [priceTouched, setPriceTouched] = useState(false);
     const [fee, setFee] = useState("0");
     const [date, setDate] = useState(() => {
         const now = new Date();
@@ -28,6 +33,16 @@ export function AddTransactionForm({portfolioId}: Props) {
       });
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+    const {data: close, isFetching: isCloseLoading, isError: isCloseError, isFetched: isCloseFetched} = useMarketClose(symbol, date);
+
+    useEffect(() => {
+        setPriceTouched(false);
+    }, [symbol, date]);
+
+    useEffect(() => {
+        if (priceTouched || close == null) return;
+        setPrice(String(close.close));
+    }, [close, priceTouched]);
 
     const mutation = useMutation({
         mutationFn: () => {
@@ -47,6 +62,7 @@ export function AddTransactionForm({portfolioId}: Props) {
             setSuccess("Transaction added successfully. Press Sync to update portfolio data.");
             setSymbol("");
             setPrice("");
+            setPriceTouched(false);
             await queryClient.invalidateQueries({queryKey: ["portfolio", portfolioId]});
             await queryClient.invalidateQueries({queryKey: ["portfolios"]});
         },
@@ -75,17 +91,16 @@ export function AddTransactionForm({portfolioId}: Props) {
       {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
       {success && <p className="text-sm text-[var(--color-accent)]">{success}</p>}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <div>
+        <div className="sm:col-span-2">
           <label htmlFor="tx-symbol" className="block text-xs text-[var(--color-text-muted)] mb-1">
             Symbol
           </label>
-          <input
+          <SymbolSearchField
             id="tx-symbol"
-            required
-            placeholder="1155.KL or AAPL"
             value={symbol}
-            onChange={(e) => setSymbol(e.target.value)}
+            onChange={setSymbol}
             className={inputClass}
+            holdings={holdings}
           />
         </div>
         <div>
@@ -123,9 +138,21 @@ export function AddTransactionForm({portfolioId}: Props) {
             step="any"
             required
             value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            onChange={(e) => {
+              setPriceTouched(true);
+              setPrice(e.target.value);
+            }}
             className={inputClass}
           />
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+            {isCloseLoading && "Loading close price..."}
+            {!isCloseLoading && close && (
+              <>Filled from close on {close.date}{close.date !== date ? " (prior session)" : ""}</>
+            )}
+            {!isCloseLoading && !close && isCloseFetched && (isCloseError
+              ? "Could not load price — enter it manually"
+              : "No close for this date — enter it manually")}
+          </p>
         </div>
         <div>
           <label htmlFor="tx-fee" className="block text-xs text-[var(--color-text-muted)] mb-1">
@@ -156,7 +183,7 @@ export function AddTransactionForm({portfolioId}: Props) {
         </div>
       </div>
       <p className="text-xs text-[var(--color-text-muted)]">
-        Currency is inferred automatically: `.KL` = MYR, otherwise USD
+        Click the symbol field to pick a ticker. Quantity and fee are yours to enter. Price fills from the market close on that date (you can still edit it). `.KL` = MYR, otherwise USD
       </p>
       <button
         type="submit"

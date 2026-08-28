@@ -1,5 +1,5 @@
 import type { Holding, PortfolioAllocation } from "../../types/api.types";
-import { formatMoney, formatPctAbs } from "../../utils/format";
+import { formatMoney, formatPct, formatPctAbs, toneClass } from "../../utils/format";
 
 type Props = {
   holdings: Holding[] | undefined;
@@ -43,7 +43,9 @@ export function HoldingsTable({
             <th className="pb-2 font-medium">Exchange</th>
             <th className="pb-2 font-medium text-right">Quantity</th>
             <th className="pb-2 font-medium text-right">Avg Cost</th>
+            <th className="pb-2 font-medium text-right">Last</th>
             <th className="pb-2 font-medium text-right">Market Value</th>
+            <th className="pb-2 font-medium text-right">P&L</th>
             <th className="pb-2 font-medium text-right">Allocation</th>
           </tr>
         </thead>
@@ -65,7 +67,28 @@ export function HoldingsTable({
                   {formatMoney(Number(holding.avgCost), holding.currency)}
                 </td>
                 <td className="py-2 text-right">
-                  {alloc ? formatMoney(alloc.marketValue, currency) : "—"}
+                  {holding.lastPrice != null
+                    ? formatMoney(Number(holding.lastPrice), holding.currency)
+                    : "—"}
+                </td>
+                <td className="py-2 text-right">
+                  {holding.marketValue != null
+                    ? formatMoney(holding.marketValue, currency)
+                    : alloc
+                      ? formatMoney(alloc.marketValue, currency)
+                      : "—"}
+                </td>
+                <td className={`py-2 text-right ${holding.unrealizedPnL != null ? toneClass(holding.unrealizedPnL) : ""}`}>
+                  {holding.unrealizedPnL != null ? (
+                    <>
+                      <div>{formatMoney(holding.unrealizedPnL, currency)}</div>
+                      {holding.unrealizedPnLPct != null && (
+                        <div className="text-xs">{formatPct(holding.unrealizedPnLPct)}</div>
+                      )}
+                    </>
+                  ) : (
+                    "—"
+                  )}
                 </td>
                 <td className="py-2 text-right">
                   {alloc ? formatPctAbs(alloc.percentage) : "—"}

@@ -17,12 +17,12 @@ import {
   
   export function PerformanceChart({ data, isLoading }: Props) {
     if (isLoading) {
-      return <div className="h-72 rounded-xl bg-[var(--color-surface)] animate-pulse" />;
+      return <div className="h-80 rounded-xl bg-[var(--color-surface)] animate-pulse" />;
     }
   
     if (!data || data.series.length < 2) {
       return (
-        <div className="h-72 rounded-xl bg-[var(--color-surface)] flex items-center justify-center text-sm text-[var(--color-text-muted)]">
+        <div className="h-80 rounded-xl bg-[var(--color-surface)] flex items-center justify-center text-sm text-[var(--color-text-muted)]">
           No performance data for this range
         </div>
       );
@@ -40,7 +40,7 @@ import {
     return (
       <div className="rounded-xl bg-[var(--color-surface)] p-5">
         <h2 className="text-sm text-[var(--color-text-muted)] mb-4">Performance</h2>
-        <div className="h-72">
+        <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
               <CartesianGrid stroke="#334155" strokeDasharray="3 3" />
