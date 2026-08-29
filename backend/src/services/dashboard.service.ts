@@ -1,4 +1,4 @@
-import {Currency, Exchange} from "@prisma/client";
+import {Currency, Exchange, TransactionType} from "@prisma/client";
 import {env} from "../config/env";
 import {prisma} from "../lib/prisma";
 import {AppError} from "../utils/AppError";
@@ -9,14 +9,17 @@ import {
     beta,
     cagr,
     compositeBenchmarkReturns,
+    indexTo100,
     maxDrawdown,
     sharpeRatio,
+    timeWeightedIndex,
     toDailyReturns,
     volatility,
 } from "./metrics.service";
 import {currencyFromSymbol} from "./market.service";
 import {getOwnedPortfolio} from "./portfolio.service";
 import {markOpenPositions} from "./valuation.service";
+import {latestAtOrBefore, loadUsdMyrSeries, toBase} from "./fx";
 import {type Range, resolveRangeStart, toDateKey} from "../utils/dateRange";
 
 export type {Range};
@@ -84,6 +87,76 @@ async function loadAlignedBenchmark(
     }
 
     return {pSeries, kSeries, gSeries};
+}
+
+async function loadBenchmarkLevels(dates: string[]) {
+    const rows = await prisma.benchmarkPrice.findMany({
+        where: {symbol: {in: [BURSA_BENCHMARK, US_BENCHMARK]}},
+        orderBy: {date: "asc"},
+    });
+
+    const klciPoints = rows
+        .filter((row) => row.symbol === BURSA_BENCHMARK)
+        .map((row) => ({date: row.date.getTime(), close: Number(row.close)}));
+    const spxPoints = rows
+        .filter((row) => row.symbol === US_BENCHMARK)
+        .map((row) => ({date: row.date.getTime(), close: Number(row.close)}));
+
+    const klci: DailyValue[] = [];
+    const spx: DailyValue[] = [];
+    let lastKlci: number | null = null;
+    let lastSpx: number | null = null;
+
+    for (const date of dates) {
+        const time = Date.parse(`${date}T00:00:00.000Z`);
+        lastKlci = latestAtOrBefore(klciPoints, time) ?? lastKlci;
+        lastSpx = latestAtOrBefore(spxPoints, time) ?? lastSpx;
+        if (lastKlci != null) klci.push({date, value: lastKlci});
+        if (lastSpx != null) spx.push({date, value: lastSpx});
+    }
+    return {klci, spx};
+}
+
+async function cashFlowBySnapshotDate(
+    portfolioId: string,
+    baseCurrency: Currency,
+    snapshots: DailyValue[]
+): Promise<Map<string, number>> {
+    const flows = new Map<string, number>();
+    if (snapshots.length < 2) return flows;
+
+    const [transactions, fxSeries] = await Promise.all([
+        prisma.transaction.findMany({
+            where: {portfolioId},
+            orderBy: [{date: "asc"}, {createdAt: "asc"}],
+        }),
+        loadUsdMyrSeries(),
+    ]);
+
+    const firstTime = Date.parse(`${snapshots[0].date}T00:00:00.000Z`);
+    let txIndex = 0;
+    while (txIndex < transactions.length && transactions[txIndex].date.getTime() <= firstTime) {
+        txIndex++;
+    }
+
+    for (let i = 1; i < snapshots.length; i++) {
+        const time = Date.parse(`${snapshots[i].date}T00:00:00.000Z`);
+        let cashFlow = 0;
+        while (txIndex < transactions.length && transactions[txIndex].date.getTime() <= time) {
+            const t = transactions[txIndex];
+            const qty = Number(t.quantity);
+            const native =
+                t.type === TransactionType.BUY
+                    ? qty * Number(t.price) + Number(t.fee)
+                    : -(qty * Number(t.price) - Number(t.fee));
+            const base = toBase(native, t.currency, baseCurrency, fxSeries, t.date.getTime());
+            if (base != null) cashFlow += base;
+            txIndex++;
+        }
+        flows.set(snapshots[i].date, cashFlow);
+    }
+
+    return flows;
 }
 
 export async function getSummary(portfolioId: string, userId: string) {
@@ -208,14 +281,17 @@ export async function getMetrics(portfolioId: string, userId: string, range: Ran
 
 export async function getPerformance(portfolioId: string, userId: string, range: Range) {
     const portfolio = await getOwnedPortfolio(portfolioId, userId);
-    const series = await loadSnapshotSeries(portfolioId, range);
+    const nav = await loadSnapshotSeries(portfolioId, range);
 
-    if (series.length === 0) {
-        return {range, series: [], benchmarkSeries: []};
+    if (nav.length === 0) {
+        return {range, series: [], benchmarkSeries: [], klciSeries: [], spxSeries: []};
     }
 
     const weights = await getBenchmarkWeights(portfolioId, portfolio.baseCurrency);
-    const {pSeries, kSeries, gSeries} = await loadAlignedBenchmark(series, weights, range);
+    const {pSeries, kSeries, gSeries} = await loadAlignedBenchmark(nav, weights, range);
+    const {klci, spx} = await loadBenchmarkLevels(nav.map((point) => point.date));
+    const cashFlows = await cashFlowBySnapshotDate(portfolioId, portfolio.baseCurrency, nav);
+    const series = timeWeightedIndex(nav, cashFlows);
 
     const benchmarkSeries: {date: string; indexedValue: number}[] = [];
     if (pSeries.length >= 2) {
@@ -233,7 +309,14 @@ export async function getPerformance(portfolioId: string, userId: string, range:
             benchmarkSeries.push({date: pSeries[i + 1].date, indexedValue: indexed});
         }
     }
-    return {range, series, benchmarkSeries};
+
+    return {
+        range,
+        series,
+        benchmarkSeries,
+        klciSeries: indexTo100(klci),
+        spxSeries: indexTo100(spx),
+    };
 }
 
 export async function getAllocation(portfolioId: string, userId: string) {
