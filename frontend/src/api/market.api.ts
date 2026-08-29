@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { Currency, SymbolSearchHit } from "../types/api.types";
+import type { Currency, IvSurface, SymbolSearchHit } from "../types/api.types";
 
 export async function searchSymbols(query: string): Promise<SymbolSearchHit[]> {
   const {data} = await apiClient.get<SymbolSearchHit[]>("/market/search", {
@@ -18,6 +18,14 @@ export type MarketClose = {
 export async function getMarketClose(symbol: string, date: string): Promise<MarketClose | null> {
   const {data} = await apiClient.get<MarketClose | null>("/market/close", {
     params: {symbol, date},
+  });
+  return data;
+}
+
+export async function getIvSurface(symbol: string): Promise<IvSurface> {
+  const {data} = await apiClient.get<IvSurface>("/market/iv-surface", {
+    params: {symbol},
+    timeout: 60_000,
   });
   return data;
 }

@@ -3,7 +3,7 @@ import {Currency} from "@prisma/client";
 import {prisma} from "../lib/prisma";
 
 // v3: default export is a class — instantiate first
-const yahooFinance = new YahooFinance();
+export const yahooFinance = new YahooFinance();
 
 export const BENCHMARK_SYMBOLS = ["^KLSE", "^GSPC"];
 const USD_MYR_SYMBOL = "MYR=X";
