@@ -161,3 +161,26 @@ export type TransactionListResponse = {
         totalPages: number;
     };
 };
+
+export type IvSurfacePoint = {
+    expiry: string;
+    ttm: number;
+    strike: number;
+    moneyness: number;
+    iv: number;
+    mid: number;
+    right: "call" | "put";
+    method: "newton" | "bisection";
+    yahooIv: number | null;
+};
+
+export type IvSurface = {
+    symbol: string;
+    spot: number;
+    rate: number;
+    dividendYield: number;
+    asOf: string;
+    points: IvSurfacePoint[];
+    newtonCount: number;
+    bisectionCount: number;
+};

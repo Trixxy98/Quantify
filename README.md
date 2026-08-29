@@ -24,6 +24,7 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 - **Analysis** — contribution by name (stock vs FX), variance share, trailing beta; sliders for KLCI / S&P / USD-MYR (linear estimate, not a forecast)
 - **Holdings** — table + price chart with **avg cost** and **max drawdown** (peak → trough in the selected range)
 - **Transactions** — symbol search, close-price fill on trade date
+- **Vol** — US options chain, Black–Scholes implied vol (Newton + bisection), 3D surface + skew/term slices
 - Manual **Sync** still exists for a full market pass
 - Daily cron: 6:30am MYT, Tue–Sat (after the US close)
 
@@ -44,6 +45,7 @@ Tickers: `.KL` → Bursa / MYR; anything without a dot → US / USD.
 - No orders, custody, or live quotes as a trading feed
 - No dividend / corporate-action ledger (total return is incomplete without that)
 - No price prediction or chart-pattern signals
+- IV surface is European Black–Scholes on US listed chains (American options ≈ teaching approx)
 - Scenario shocks are `weight × beta × index + FX sensitivity`, not a model
 
 ## Setup
@@ -75,7 +77,7 @@ npm run dev
 
 Root `.env` is for Compose (`POSTGRES_*`). `backend/.env` `DATABASE_URL` must match that user/password/db/port (`5434` by default). Frontend `VITE_API_URL=http://localhost:4000/api`.
 
-Optional: `RISK_FREE_RATE` on the API (default `0.03`) for Sharpe/alpha.
+Optional: `RISK_FREE_RATE` on the API (default `0.03`) for Sharpe/alpha and the IV surface.
 
 ## API (auth required except `/health` and `/api/auth/*`)
 
@@ -86,7 +88,7 @@ Optional: `RISK_FREE_RATE` on the API (default `0.03`) for Sharpe/alpha.
 | GET | `/api/portfolios/:id/summary` `metrics` `performance` `allocation` `analysis` | `?range=` `1M` `3M` `6M` `1Y` `YTD` `ALL` |
 | GET | `/api/portfolios/:id/holdings` `transactions` `prices/:symbol` | |
 | POST/PATCH/DELETE | `/api/portfolios/:id/transactions` | Edit/delete recomputes holdings |
-| GET | `/api/market/search` `close` | Yahoo search; close on or before date |
+| GET | `/api/market/search` `close` `iv-surface` | Yahoo search; close; US options IV surface |
 | POST | `/api/sync` | Full price + snapshot rebuild |
 
 ## Scripts
