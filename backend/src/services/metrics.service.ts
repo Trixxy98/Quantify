@@ -71,3 +71,32 @@ export function beta(portfolioReturns: number[], benchmarkReturns: number[]): nu
   ): number[] {
     return klciReturns.map((r, i) => r * bursaWeight + sp500Returns[i] * usWeight);
   }
+
+export function indexTo100(series: DailyValue[]): {date: string; indexedValue: number}[] {
+    if (series.length === 0) return [];
+    const start = series[0].value;
+    if (start <= 0) return series.map((point) => ({date: point.date, indexedValue: 100}));
+    return series.map((point) => ({
+        date: point.date,
+        indexedValue: (point.value / start) * 100,
+    }));
+}
+
+/** Index starting at 100. `cashFlowByDate` is money in (+) / out (−) on that date. */
+export function timeWeightedIndex(
+    values: DailyValue[],
+    cashFlowByDate: Map<string, number>
+): DailyValue[] {
+    if (values.length === 0) return [];
+    const out: DailyValue[] = [{date: values[0].date, value: 100}];
+    let indexed = 100;
+    for (let i = 1; i < values.length; i++) {
+        const prev = values[i - 1].value;
+        const curr = values[i].value;
+        const cashFlow = cashFlowByDate.get(values[i].date) ?? 0;
+        const dailyReturn = prev > 1e-6 ? (curr - prev - cashFlow) / prev : 0;
+        indexed *= 1 + dailyReturn;
+        out.push({date: values[i].date, value: indexed});
+    }
+    return out;
+}

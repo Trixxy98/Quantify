@@ -61,6 +61,7 @@ cp .env.example .env
 # Set JWT_ACCESS_SECRET and JWT_REFRESH_SECRET to ≥32 characters
 npm install
 npx prisma migrate dev
+npm run prisma:seed   # optional: extra sample trades for SEED_EMAIL (default harith@gmail.com)
 npm run dev
 # http://localhost:4000  —  GET /health
 

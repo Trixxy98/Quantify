@@ -57,6 +57,8 @@ export type PortfolioPerformance = {
     range: Range;
     series: PerformancePoint[];
     benchmarkSeries: BenchmarkPoint[];
+    klciSeries: BenchmarkPoint[];
+    spxSeries: BenchmarkPoint[];
 };
 
 export type AllocationItem = {

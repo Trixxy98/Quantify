@@ -107,6 +107,20 @@ async function recomputeHolding(
     });
 }
 
+export async function recomputePortfolioHoldings(portfolioId: string) {
+    const symbols = await prisma.transaction.findMany({
+        where: {portfolioId},
+        distinct: ["symbol"],
+        select: {symbol: true, currency: true},
+    });
+
+    await prisma.$transaction(async (tx) => {
+        for (const row of symbols) {
+            await recomputeHolding(tx, portfolioId, row.symbol, row.currency);
+        }
+    });
+}
+
 export async function createTransaction(
     portfolioId: string,
     userId: string,
