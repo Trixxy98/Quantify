@@ -185,6 +185,18 @@ export type IvSurface = {
     bisectionCount: number;
 };
 
+export type TickerQuote = {
+    symbol: string;
+    name: string;
+    price: number;
+    change: number;
+    /** Fraction, not percent: 0.0162 means +1.62%. */
+    changePercent: number;
+    currency: string;
+    marketState: string;
+    asOf: string | null;
+};
+
 export type EventType = "FOMC" | "CPI" | "EARNINGS";
 
 export type EventStudyOffset = {

@@ -142,6 +142,84 @@ export async function searchSymbols(query: string): Promise<SymbolSearchHit[]> {
     return hits;
 }
 
+export type TickerQuote = {
+    symbol: string;
+    name: string;
+    price: number;
+    change: number;
+    /** Fraction, not percent: 0.0162 means +1.62%. */
+    changePercent: number;
+    currency: string;
+    marketState: string;
+    asOf: string | null;
+};
+
+// Short cache so several open tabs polling the tape share one Yahoo call.
+const QUOTE_TTL_MS = 15_000;
+const quoteCache = new Map<string, {value: TickerQuote; expiresAt: number}>();
+
+type RawQuote = {
+    symbol?: string;
+    shortName?: string;
+    longName?: string;
+    regularMarketPrice?: number;
+    regularMarketChange?: number;
+    regularMarketChangePercent?: number;
+    currency?: string;
+    marketState?: string;
+    regularMarketTime?: Date | number | string;
+};
+
+function toTickerQuote(raw: RawQuote): TickerQuote | null {
+    const symbol = raw.symbol?.toUpperCase();
+    const price = Number(raw.regularMarketPrice);
+    if (!symbol || !Number.isFinite(price)) return null;
+
+    const time = raw.regularMarketTime;
+    const asOf = time == null ? null : new Date(time instanceof Date ? time : time).toISOString();
+
+    return {
+        symbol,
+        name: raw.shortName ?? raw.longName ?? symbol,
+        price,
+        change: Number.isFinite(Number(raw.regularMarketChange)) ? Number(raw.regularMarketChange) : 0,
+        changePercent: Number.isFinite(Number(raw.regularMarketChangePercent))
+            ? Number(raw.regularMarketChangePercent) / 100
+            : 0,
+        currency: raw.currency ?? "",
+        marketState: raw.marketState ?? "UNKNOWN",
+        asOf: asOf && !Number.isNaN(Date.parse(asOf)) ? asOf : null,
+    };
+}
+
+export async function getQuotes(symbols: string[]): Promise<TickerQuote[]> {
+    const wanted = [...new Set(symbols.map((s) => s.trim().toUpperCase()).filter(Boolean))];
+    const now = Date.now();
+    const resolved = new Map<string, TickerQuote>();
+    const missing: string[] = [];
+
+    for (const symbol of wanted) {
+        const cached = quoteCache.get(symbol);
+        if (cached && cached.expiresAt > now) resolved.set(symbol, cached.value);
+        else missing.push(symbol);
+    }
+
+    if (missing.length > 0) {
+        const result = await yahooFinance.quote(missing);
+        const rows = (Array.isArray(result) ? result : [result]) as RawQuote[];
+        for (const row of rows) {
+            const quote = toTickerQuote(row);
+            if (!quote) continue;
+            resolved.set(quote.symbol, quote);
+            quoteCache.set(quote.symbol, {value: quote, expiresAt: now + QUOTE_TTL_MS});
+        }
+    }
+
+    return wanted
+        .map((symbol) => resolved.get(symbol))
+        .filter((quote): quote is TickerQuote => quote != null);
+}
+
 export type MarketClose = {
     symbol: string;
     date: string;
