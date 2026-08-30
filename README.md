@@ -25,6 +25,7 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 - **Holdings** — table + price chart with **avg cost** and **max drawdown** (peak → trough in the selected range)
 - **Transactions** — symbol search, close-price fill on trade date
 - **Vol** — US options chain, Black–Scholes implied vol (Newton + bisection), 3D surface + skew/term slices
+- **Events** — event study around Fed days, CPI releases and earnings: market-model abnormal returns, CAR with a ±2 s.e. band, event-day vs other-day return distributions, and an event-only trading rule
 - Manual **Sync** still exists for a full market pass
 - Daily cron: 6:30am MYT, Tue–Sat (after the US close)
 
@@ -46,6 +47,7 @@ Tickers: `.KL` → Bursa / MYR; anything without a dot → US / USD.
 - No dividend / corporate-action ledger (total return is incomplete without that)
 - No price prediction or chart-pattern signals
 - IV surface is European Black–Scholes on US listed chains (American options ≈ teaching approx)
+- Event dates are best-effort: FOMC is the official Fed calendar, but earnings dates are derived from Yahoo's 10-Q/10-K list (Yahoo does not publish historical announcement dates) and CPI needs a FRED key
 - Scenario shocks are `weight × beta × index + FX sensitivity`, not a model
 
 ## Setup
@@ -79,6 +81,8 @@ Root `.env` is for Compose (`POSTGRES_*`). `backend/.env` `DATABASE_URL` must ma
 
 Optional: `RISK_FREE_RATE` on the API (default `0.03`) for Sharpe/alpha and the IV surface.
 
+Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to load CPI release dates for the Events page — BLS blocks automated fetches of its own schedule, so run `npm run events:cpi` once and the dates are written into `src/data/macroEvents.json`. Fed days ship with the repo and need no key.
+
 ## API (auth required except `/health` and `/api/auth/*`)
 
 | Method | Path | Notes |
@@ -89,11 +93,12 @@ Optional: `RISK_FREE_RATE` on the API (default `0.03`) for Sharpe/alpha and the 
 | GET | `/api/portfolios/:id/holdings` `transactions` `prices/:symbol` | |
 | POST/PATCH/DELETE | `/api/portfolios/:id/transactions` | Edit/delete recomputes holdings |
 | GET | `/api/market/search` `close` `iv-surface` | Yahoo search; close; US options IV surface |
+| GET | `/api/events/study` | `?symbols=` `type=FOMC\|CPI\|EARNINGS` `pre=` `post=` `years=` `hold=` |
 | POST | `/api/sync` | Full price + snapshot rebuild |
 
 ## Scripts
 
-**Backend:** `npm run dev` · `npm run typecheck` · `npm run prisma:migrate` · `npm run prisma:studio`
+**Backend:** `npm run dev` · `npm run typecheck` · `npm run prisma:migrate` · `npm run prisma:studio` · `npm run events:cpi`
 
 **Frontend:** `npm run dev` · `npm run build` · `npm run lint`
 

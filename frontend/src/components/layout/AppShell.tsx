@@ -169,6 +169,9 @@ export function AppShell() {
               <NavLink to="/vol" className={navClass}>
                 Vol
               </NavLink>
+              <NavLink to="/events" className={navClass}>
+                Events
+              </NavLink>
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -198,6 +201,9 @@ export function AppShell() {
           </NavLink>
           <NavLink to="/vol" className={navClass}>
             Vol
+          </NavLink>
+          <NavLink to="/events" className={navClass}>
+            Events
           </NavLink>
         </nav>
       </header>
