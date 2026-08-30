@@ -8,13 +8,32 @@ import { readSelectedPortfolioId, writeSelectedPortfolioId } from "../../utils/s
 import { CreatePortfolioForm } from "../dashboard/CreatePortfolioForm";
 import { RenamePortfolioForm } from "../dashboard/RenamePortfolioForm";
 import { SyncButton } from "../dashboard/SyncButton";
+import { TickerTape } from "./TickerTape";
 
 export type AppShellContext = {
   portfolioId: string | undefined;
 };
 
+const NAV_ITEMS = [
+  { to: "/dashboard", label: "Overview" },
+  { to: "/analysis", label: "Analysis" },
+  { to: "/holdings", label: "Holdings" },
+  { to: "/transactions", label: "Transactions" },
+  { to: "/vol", label: "Vol" },
+  { to: "/events", label: "Events" },
+];
+
+// Tabs read as navigation; the filled pill is what marks the current page.
 const navClass = ({ isActive }: { isActive: boolean }) =>
-  `text-sm ${isActive ? "text-[var(--color-text)]" : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"}`;
+  `shrink-0 rounded-md px-3 py-1.5 text-sm transition-colors ${
+    isActive
+      ? "bg-[var(--color-surface)] font-medium text-[var(--color-text)]"
+      : "text-[var(--color-text-muted)] hover:bg-slate-800/60 hover:text-[var(--color-text)]"
+  }`;
+
+// Matches SyncButton so every header action looks like an action, not a link.
+const ghostButtonClass =
+  "shrink-0 rounded-md border border-slate-600 px-3 py-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]";
 
 export function AppShell() {
   const user = useAuthStore((state) => state.user);
@@ -64,13 +83,13 @@ export function AppShell() {
     <div className="min-h-screen">
       <header className="border-b border-slate-800">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-6">
-          <div className="flex min-w-0 items-center gap-4">
-            <Link to="/dashboard" className="shrink-0 text-sm font-semibold tracking-wide">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link to="/dashboard" className="shrink-0 text-base font-semibold tracking-wide">
               Quantify
             </Link>
             {portfolios && portfolios.length > 0 && (
               <>
-                <span className="hidden h-4 w-px bg-slate-700 sm:block" />
+                <span className="hidden h-5 w-px bg-slate-700 sm:block" />
                 <label htmlFor="portfolio-select" className="sr-only">
                   Portfolio
                 </label>
@@ -83,7 +102,7 @@ export function AppShell() {
                     setIsCreating(false);
                     setIsManageOpen(false);
                   }}
-                  className="max-w-[14rem] truncate bg-transparent py-1 text-sm font-medium outline-none"
+                  className="max-w-[14rem] shrink-0 truncate rounded-md border border-slate-600 bg-transparent px-2 py-1 text-sm font-medium text-[var(--color-text)] outline-none"
                 >
                   {portfolios.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -102,7 +121,7 @@ export function AppShell() {
                   <button
                     type="button"
                     onClick={() => setIsManageOpen((open) => !open)}
-                    className="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+                    className={ghostButtonClass}
                   >
                     Manage
                   </button>
@@ -153,62 +172,29 @@ export function AppShell() {
                 </div>
               </>
             )}
-            <nav className="ml-2 hidden items-center gap-4 sm:flex">
-              <NavLink to="/dashboard" className={navClass}>
-                Overview
-              </NavLink>
-              <NavLink to="/analysis" className={navClass}>
-                Analysis
-              </NavLink>
-              <NavLink to="/holdings" className={navClass}>
-                Holdings
-              </NavLink>
-              <NavLink to="/transactions" className={navClass}>
-                Transactions
-              </NavLink>
-              <NavLink to="/vol" className={navClass}>
-                Vol
-              </NavLink>
-              <NavLink to="/events" className={navClass}>
-                Events
-              </NavLink>
-            </nav>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex shrink-0 items-center gap-3">
             <SyncButton />
+            <span className="hidden h-5 w-px bg-slate-700 sm:block" />
             <span className="hidden text-sm text-[var(--color-text-muted)] sm:inline">{user?.name}</span>
-            <button
-              type="button"
-              onClick={logout}
-              className="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
-            >
+            <button type="button" onClick={logout} className={ghostButtonClass}>
               Log out
             </button>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-7xl gap-4 px-6 pb-3 sm:hidden">
-          <NavLink to="/dashboard" className={navClass}>
-            Overview
-          </NavLink>
-          <NavLink to="/analysis" className={navClass}>
-            Analysis
-          </NavLink>
-          <NavLink to="/holdings" className={navClass}>
-            Holdings
-          </NavLink>
-          <NavLink to="/transactions" className={navClass}>
-            Transactions
-          </NavLink>
-          <NavLink to="/vol" className={navClass}>
-            Vol
-          </NavLink>
-          <NavLink to="/events" className={navClass}>
-            Events
-          </NavLink>
-        </nav>
+
+        <div className="border-t border-slate-800/70">
+          <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-6 py-2">
+            {NAV_ITEMS.map((item) => (
+              <NavLink key={item.to} to={item.to} className={navClass}>
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-6 space-y-8">
+      <main className="mx-auto max-w-7xl px-6 pt-6 pb-28 space-y-8">
         {!isPortfoliosLoading && !portfolioId && (
           <CreatePortfolioForm onCreated={setSelectedId} />
         )}
@@ -233,6 +219,8 @@ export function AppShell() {
         )}
         <Outlet context={{ portfolioId } satisfies AppShellContext} />
       </main>
+
+      <TickerTape />
     </div>
   );
 }
