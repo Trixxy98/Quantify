@@ -1,6 +1,7 @@
 import {Currency, Exchange, Prisma, TransactionType} from "@prisma/client";
 import {prisma} from "../lib/prisma";
 import {AppError} from "../utils/AppError";
+import {adjustTrade} from "./corporateActions";
 import {refreshPortfolioAfterTradeQuietly} from "./refresh.service";
 import {markOpenPositions} from "./valuation.service";
 
@@ -68,17 +69,21 @@ async function recomputeHolding(
         where: {portfolioId, symbol},
         orderBy: [{date: "asc"}, {createdAt: "asc"}],
     });
+    // Queried on the same client: a split rewrites what "one share" means, so
+    // holdings have to be stated on the same basis as Yahoo's prices.
+    const splits = await tx.stockSplit.findMany({where: {symbol}, orderBy: {date: "asc"}});
 
     let quantity = 0;
     let totalCost = 0;
 
     for (const t of transactions) {
-        const q = Number(t.quantity);
+        const rawQty = Number(t.quantity);
         const p = Number(t.price);
         const fee = Number(t.fee);
+        const {quantity: q} = adjustTrade(rawQty, p, splits, t.date.getTime());
 
         if (t.type === TransactionType.BUY) {
-            totalCost += q * p + fee;
+            totalCost += rawQty * p + fee;
             quantity += q;
         } else {
             if (q > quantity + 1e-9) {

@@ -119,10 +119,40 @@ model PortfolioSnapshot {
   date        DateTime  @db.Date
   totalValue  Decimal   @db.Decimal(18, 6) // in the portfolio's baseCurrency
   totalCost   Decimal   @db.Decimal(18, 6)
+  // Cash dividends going ex on this date, in base currency. NAV drops by this
+  // amount on the ex-date, so the return calculation has to add it back.
+  dividendIncome Decimal @db.Decimal(18, 6) @default(0)
   createdAt   DateTime  @default(now())
 
   @@unique([portfolioId, date])
   @@index([portfolioId, date])
+}
+
+// Yahoo returns OHLC already adjusted for splits, so a new split silently
+// rebases the whole history. We store splits to re-express pre-split trades
+// in post-split terms, and to detect when stored prices went stale.
+model StockSplit {
+  id          String   @id @default(cuid())
+  symbol      String
+  date        DateTime @db.Date
+  numerator   Int // 4 for a 4:1 split
+  denominator Int // 1 for a 4:1 split
+
+  @@unique([symbol, date])
+  @@index([symbol, date])
+}
+
+// Cash dividends. Yahoo `close` is not dividend adjusted, so without these
+// every return in the app is a price return and understates performance.
+model Dividend {
+  id       String   @id @default(cuid())
+  symbol   String
+  exDate   DateTime @db.Date
+  amount   Decimal  @db.Decimal(18, 6) // per share, in the symbol's own currency
+  currency Currency
+
+  @@unique([symbol, exDate])
+  @@index([symbol, exDate])
 }
 
 // Benchmark index for Beta & Alpha (e.g. ^KLSE for Bursa, ^GSPC for US)

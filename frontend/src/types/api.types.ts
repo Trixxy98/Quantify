@@ -45,9 +45,18 @@ export type PortfolioMetrics = {
     cagr: number;
     volatility: number;
     sharpeRatio: number;
+    /** Error bar on the Sharpe, same annualized scale. */
+    sharpeStandardError: number;
     beta: number;
     alpha: number;
     maxDrawdown: number;
+    /** Dividends collected inside the range, base currency. */
+    dividendIncome: number;
+    /** Daily observations behind the risk statistics. */
+    observations: number;
+    isLowConfidence: boolean;
+    /** "^SP500TR" (total return) or "^GSPC" (price only, pre-sync fallback). */
+    usBenchmark: string;
 };
 
 export type PerformancePoint = {date: string; value: number};
@@ -59,6 +68,7 @@ export type PortfolioPerformance = {
     benchmarkSeries: BenchmarkPoint[];
     klciSeries: BenchmarkPoint[];
     spxSeries: BenchmarkPoint[];
+    usBenchmark: string;
 };
 
 export type AllocationItem = {

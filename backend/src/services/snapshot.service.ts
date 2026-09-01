@@ -1,6 +1,7 @@
 import {TransactionType} from "@prisma/client";
 import {prisma} from "../lib/prisma";
 import {currencyFromSymbol} from "./market.service";
+import {adjustTrade, loadDividends, loadSplits} from "./corporateActions";
 import {latestAtOrBefore, loadUsdMyrSeries, toBase as convertToBase, type SeriesPoint} from "./fx";
 
 export async function rebuildSnapshots(portfolioId: string) {
@@ -27,6 +28,18 @@ export async function rebuildSnapshots(portfolioId: string) {
     });
 
     const rateSeries = await loadUsdMyrSeries();
+    const splitsBySymbol = await loadSplits(symbols);
+    const dividendsBySymbol = await loadDividends(symbols);
+
+    // Flat, time-ordered dividend events so the calendar walk below can pay
+    // each one against whatever quantity was held when it went ex.
+    const dividendEvents: {time: number; symbol: string; amount: number}[] = [];
+    for (const [symbol, rows] of dividendsBySymbol) {
+        for (const row of rows) {
+            dividendEvents.push({time: row.exDate.getTime(), symbol, amount: row.amount});
+        }
+    }
+    dividendEvents.sort((a, b) => a.time - b.time);
 
     // Price series per symbol + calendar (union of trading days)
     const priceMap = new Map<string, SeriesPoint[]>();
@@ -39,6 +52,12 @@ export async function rebuildSnapshots(portfolioId: string) {
     }
     const calendar = [...calendarSet].sort((a,b) => a-b);
 
+    // Anything that went ex before the portfolio existed is not ours to collect
+    let divIndex = 0;
+    while (divIndex < dividendEvents.length && dividendEvents[divIndex].time < calendar[0]) {
+        divIndex++;
+    }
+
     function toBase(value: number, currency: typeof baseCurrency, time: number) {
         return convertToBase(value, currency, baseCurrency, rateSeries, time);
     }
@@ -46,19 +65,26 @@ export async function rebuildSnapshots(portfolioId: string) {
     const qtyBySymbol = new Map<string, number>();
     const costBySymbol = new Map<string, number>();
     let txIndex = 0;
-    const snapshots: {date: Date; totalValue: number; totalCost: number}[] = [];
+    const snapshots: {date: Date; totalValue: number; totalCost: number; dividendIncome: number}[] =
+        [];
 
     for (const time of calendar) {
         // All transactions up to this date
         while (txIndex < transactions.length && transactions[txIndex].date.getTime() <= time) {
             const t = transactions[txIndex];
-            const q = Number(t.quantity);
+            // Prices are on Yahoo's post-split basis; the trade is not
+            const {quantity: q} = adjustTrade(
+                Number(t.quantity),
+                Number(t.price),
+                splitsBySymbol.get(t.symbol) ?? [],
+                t.date.getTime()
+            );
             const currentQty = qtyBySymbol.get(t.symbol) ?? 0;
             const currentCost = costBySymbol.get(t.symbol) ?? 0;
 
             const currency = t.currency;
             if (t.type === TransactionType.BUY) {
-                const nativeCost = q * Number(t.price) + Number(t.fee);
+                const nativeCost = Number(t.quantity) * Number(t.price) + Number(t.fee);
                 const baseCost =
                     toBase(nativeCost, currency, t.date.getTime()) ??
                     toBase(nativeCost, currency, time);
@@ -72,6 +98,23 @@ export async function rebuildSnapshots(portfolioId: string) {
                 costBySymbol.set(t.symbol, currentCost - q * avgCost);
             }
             txIndex++;
+        }
+
+        // Dividends that went ex on or before this date and after the previous
+        // one. Quantities above are already updated for trades up to `time`.
+        let dividendIncome = 0;
+        while (divIndex < dividendEvents.length && dividendEvents[divIndex].time <= time) {
+            const event = dividendEvents[divIndex];
+            const held = qtyBySymbol.get(event.symbol) ?? 0;
+            if (held > 0) {
+                const income = toBase(
+                    held * event.amount,
+                    currencyFromSymbol(event.symbol),
+                    time
+                );
+                if (income != null) dividendIncome += income;
+            }
+            divIndex++;
         }
 
         let totalValue = 0;
@@ -98,7 +141,7 @@ export async function rebuildSnapshots(portfolioId: string) {
 
         // Skip this date when FX is missing — do not persist a wrong value
         if (!rateAvailable) continue;
-        snapshots.push({date: new Date(time), totalValue, totalCost});
+        snapshots.push({date: new Date(time), totalValue, totalCost, dividendIncome});
     }
 
     if (snapshots.length === 0) {
@@ -119,7 +162,11 @@ export async function rebuildSnapshots(portfolioId: string) {
             await tx.portfolioSnapshot.upsert({
                 where: {portfolioId_date: {portfolioId, date: snapshot.date}},
                 create: {portfolioId, ...snapshot},
-                update: {totalValue: snapshot.totalValue, totalCost: snapshot.totalCost},
+                update: {
+                    totalValue: snapshot.totalValue,
+                    totalCost: snapshot.totalCost,
+                    dividendIncome: snapshot.dividendIncome,
+                },
             });
         }
     });
