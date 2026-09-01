@@ -1,6 +1,7 @@
 import {Currency, Exchange, TransactionType} from "@prisma/client";
 import {prisma} from "../lib/prisma";
 import {currencyFromSymbol} from "./market.service";
+import {adjustTrade, loadSplits} from "./corporateActions";
 import {loadUsdMyrSeries, toBase} from "./fx";
 
 export type OpenPositionMark = {
@@ -34,6 +35,7 @@ export async function markOpenPositions(
 
     const series = await loadUsdMyrSeries();
     const lastFxTime = series.at(-1)?.date ?? Date.now();
+    const splitsBySymbol = await loadSplits([...new Set(transactions.map((t) => t.symbol))]);
 
     type Acc = {qty: number; nativeCost: number; baseCost: number; currency: Currency};
     const bySymbol = new Map<string, Acc>();
@@ -45,10 +47,16 @@ export async function markOpenPositions(
             baseCost: 0,
             currency: t.currency,
         };
-        const q = Number(t.quantity);
+        // Share count on Yahoo's post-split basis; cash spent is unchanged
+        const {quantity: q} = adjustTrade(
+            Number(t.quantity),
+            Number(t.price),
+            splitsBySymbol.get(t.symbol) ?? [],
+            t.date.getTime()
+        );
 
         if (t.type === TransactionType.BUY) {
-            const native = q * Number(t.price) + Number(t.fee);
+            const native = Number(t.quantity) * Number(t.price) + Number(t.fee);
             const base =
                 toBase(native, t.currency, baseCurrency, series, t.date.getTime()) ??
                 toBase(native, t.currency, baseCurrency, series, lastFxTime);

@@ -1,11 +1,16 @@
 import YahooFinance from "yahoo-finance2";
 import {Currency} from "@prisma/client";
 import {prisma} from "../lib/prisma";
+import {isRebased} from "./corporateActions";
 
 // v3: default export is a class — instantiate first
 export const yahooFinance = new YahooFinance();
 
-export const BENCHMARK_SYMBOLS = ["^KLSE", "^GSPC"];
+// ^SP500TR is the total-return version of the S&P 500: the dashboard compares
+// it against a portfolio that now counts dividends, so a price index there
+// would hand the portfolio free alpha. ^GSPC stays for price-vs-price work
+// (per-symbol beta, event studies).
+export const BENCHMARK_SYMBOLS = ["^KLSE", "^GSPC", "^SP500TR"];
 const USD_MYR_SYMBOL = "MYR=X";
 
 export function currencyFromSymbol(symbol: string): Currency {
@@ -18,12 +23,71 @@ function toUtcDate(d: Date): Date {
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
-async function fetchDailyBars(symbol: string, from: Date) {
+// Corporate actions have to be complete regardless of how short the price
+// refresh window is, so events are always pulled from the start of history.
+const HISTORY_START = new Date("2000-01-01T00:00:00.000Z");
+
+type ChartEvents = {
+    dividends?: {amount?: number; date?: Date}[];
+    splits?: {date?: Date; numerator?: number; denominator?: number}[];
+};
+
+async function fetchChart(symbol: string, from: Date) {
     const result = await yahooFinance.chart(symbol, {
         period1: from,
         interval: "1d",
+        events: "div|split",
     });
-    return result.quotes.filter((q) => q.close != null);
+    return {
+        quotes: result.quotes.filter((q) => q.close != null),
+        events: (result.events ?? {}) as ChartEvents,
+    };
+}
+
+async function fetchDailyBars(symbol: string, from: Date) {
+    const {quotes} = await fetchChart(symbol, from);
+    return quotes;
+}
+
+/** Compares the oldest stored bar against what Yahoo reports for that same day. */
+async function hasRebased(symbol: string, bars: {date: Date; close?: number | null}[]) {
+    const stored = await prisma.dailyPrice.findFirst({
+        where: {symbol},
+        orderBy: {date: "asc"},
+    });
+    if (!stored) return false;
+
+    const storedTime = toUtcDate(stored.date).getTime();
+    const match = bars.find((bar) => toUtcDate(bar.date).getTime() === storedTime);
+    if (!match?.close) return false;
+
+    return isRebased(Number(stored.close), match.close);
+}
+
+async function saveCorporateActions(symbol: string, events: ChartEvents) {
+    const currency = currencyFromSymbol(symbol);
+
+    const splits = (events.splits ?? [])
+        .filter((s) => s.date && s.numerator && s.denominator)
+        .map((s) => ({
+            symbol,
+            date: toUtcDate(s.date!),
+            numerator: Math.round(s.numerator!),
+            denominator: Math.round(s.denominator!),
+        }));
+
+    const dividends = (events.dividends ?? [])
+        .filter((d) => d.date && d.amount != null && d.amount > 0)
+        .map((d) => ({symbol, exDate: toUtcDate(d.date!), amount: d.amount!, currency}));
+
+    await prisma.$transaction([
+        prisma.stockSplit.deleteMany({where: {symbol}}),
+        prisma.stockSplit.createMany({data: splits, skipDuplicates: true}),
+        prisma.dividend.deleteMany({where: {symbol}}),
+        prisma.dividend.createMany({data: dividends, skipDuplicates: true}),
+    ]);
+
+    return {splits: splits.length, dividends: dividends.length};
 }
 
 export async function getTrackedSymbols(): Promise<string[]> {
@@ -35,31 +99,46 @@ export async function getTrackedSymbols(): Promise<string[]> {
 }
 
 export async function syncDailyPrices(symbol: string, from: Date) {
-    const bars = await fetchDailyBars(symbol, from);
+    // One call covers everything: events need full history, prices only need
+    // the requested window unless the series turns out to have been rebased.
+    const {quotes: bars, events} = await fetchChart(symbol, HISTORY_START);
     const currency = currencyFromSymbol(symbol);
-    const fromDate = toUtcDate(from);
+
+    await saveCorporateActions(symbol, events);
+
+    const rebased = await hasRebased(symbol, bars);
+    const fromDate = rebased ? HISTORY_START : toUtcDate(from);
+    if (rebased) {
+        console.warn(`[sync] ${symbol} was restated by Yahoo — rewriting full price history`);
+    }
+
+    const rows = bars
+        .filter((bar) => toUtcDate(bar.date).getTime() >= fromDate.getTime())
+        .map((bar) => ({
+            symbol,
+            date: toUtcDate(bar.date),
+            open: bar.open ?? bar.close!,
+            high: bar.high ?? bar.close!,
+            low: bar.low ?? bar.close!,
+            close: bar.close!,
+            volume: BigInt(Math.round(bar.volume ?? 0)),
+            currency,
+        }));
 
     await prisma.$transaction([
         prisma.dailyPrice.deleteMany({where: {symbol, date: {gte: fromDate}}}),
-        prisma.dailyPrice.createMany({
-            data: bars.map((bar) => ({
-                symbol,
-                date: toUtcDate(bar.date),
-                open: bar.open ?? bar.close!,
-                high: bar.high ?? bar.close!,
-                low: bar.low ?? bar.close!,
-                close: bar.close!,
-                volume: BigInt(Math.round(bar.volume ?? 0)),
-                currency,
-            })),
-            skipDuplicates: true,
-        }),
+        prisma.dailyPrice.createMany({data: rows, skipDuplicates: true}),
     ]);
 }
 
 export async function syncBenchmarkPrices(symbol: string, from: Date) {
-    const bars = await fetchDailyBars(symbol, from);
-    const fromDate = toUtcDate(from);
+    // A benchmark added later (^SP500TR) starts empty, and a short window would
+    // leave it too short to ever be picked over the one already stored.
+    const existing = await prisma.benchmarkPrice.count({where: {symbol}});
+    const start = existing === 0 ? HISTORY_START : from;
+
+    const bars = await fetchDailyBars(symbol, start);
+    const fromDate = toUtcDate(start);
 
     await prisma.$transaction([
         prisma.benchmarkPrice.deleteMany({where: {symbol, date: {gte: fromDate}}}),

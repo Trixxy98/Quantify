@@ -12,6 +12,7 @@ import {
     indexTo100,
     maxDrawdown,
     sharpeRatio,
+    sharpeStandardError,
     timeWeightedIndex,
     toDailyReturns,
     volatility,
@@ -25,15 +26,61 @@ import {type Range, resolveRangeStart, toDateKey} from "../utils/dateRange";
 export type {Range};
 
 const BURSA_BENCHMARK = "^KLSE";
-const US_BENCHMARK = "^GSPC";
+const US_TOTAL_RETURN = "^SP500TR";
+const US_PRICE_INDEX = "^GSPC";
 
-async function loadSnapshotSeries(portfolioId: string, range: Range): Promise<DailyValue[]> {
+// Sharpe/vol/beta below this many observations are noise, not estimates
+const LOW_CONFIDENCE_OBSERVATIONS = 60;
+
+type SnapshotRow = {date: string; value: number; income: number};
+
+async function loadSnapshots(portfolioId: string, range: Range): Promise<SnapshotRow[]> {
     const start = resolveRangeStart(range);
     const snapshots = await prisma.portfolioSnapshot.findMany({
         where: {portfolioId, ...(start ? {date: {gte: start}} : {})},
         orderBy: {date: "asc"},
     });
-    return snapshots.map((s) => ({date: toDateKey(s.date), value: Number(s.totalValue)}));
+    return snapshots.map((s) => ({
+        date: toDateKey(s.date),
+        value: Number(s.totalValue),
+        income: Number(s.dividendIncome),
+    }));
+}
+
+function toNav(rows: SnapshotRow[]): DailyValue[] {
+    return rows.map((row) => ({date: row.date, value: row.value}));
+}
+
+function toIncomeMap(rows: SnapshotRow[]): Map<string, number> {
+    return new Map(rows.map((row) => [row.date, row.income]));
+}
+
+/**
+ * Prefer the total-return index, but a database that has not been synced since
+ * ^SP500TR was added still has to produce a chart. Never mix the two: their
+ * levels differ, so switching mid-series would invent a return.
+ */
+async function resolveUsBenchmark(): Promise<string> {
+    const [totalReturn, priceIndex] = await Promise.all([
+        prisma.benchmarkPrice.count({where: {symbol: US_TOTAL_RETURN}}),
+        prisma.benchmarkPrice.count({where: {symbol: US_PRICE_INDEX}}),
+    ]);
+    return totalReturn > 0 && totalReturn >= priceIndex * 0.9 ? US_TOTAL_RETURN : US_PRICE_INDEX;
+}
+
+/**
+ * The one place that turns NAV into a return series: strips deposits and
+ * withdrawals, adds dividends back. Both the metric cards and the performance
+ * chart read from this so they cannot drift apart.
+ */
+async function buildTwrSeries(
+    portfolioId: string,
+    baseCurrency: Currency,
+    rows: SnapshotRow[]
+): Promise<DailyValue[]> {
+    const nav = toNav(rows);
+    const cashFlows = await cashFlowBySnapshotDate(portfolioId, baseCurrency, nav);
+    return timeWeightedIndex(nav, cashFlows, toIncomeMap(rows));
 }
 
 async function getBenchmarkWeights(portfolioId: string, baseCurrency: Currency) {
@@ -52,12 +99,13 @@ async function getBenchmarkWeights(portfolioId: string, baseCurrency: Currency) 
 async function loadAlignedBenchmark(
     portfolioSeries: DailyValue[],
     weights: {bursa: number; us: number},
-    range: Range
+    range: Range,
+    usBenchmark: string
 ) {
     const start = resolveRangeStart(range);
     const rows = await prisma.benchmarkPrice.findMany({
         where: {
-            symbol: {in: [BURSA_BENCHMARK, US_BENCHMARK]},
+            symbol: {in: [BURSA_BENCHMARK, usBenchmark]},
             ...(start ? {date: {gte: start}} : {}),
         },
         orderBy: {date: "asc"},
@@ -89,9 +137,9 @@ async function loadAlignedBenchmark(
     return {pSeries, kSeries, gSeries};
 }
 
-async function loadBenchmarkLevels(dates: string[]) {
+async function loadBenchmarkLevels(dates: string[], usBenchmark: string) {
     const rows = await prisma.benchmarkPrice.findMany({
-        where: {symbol: {in: [BURSA_BENCHMARK, US_BENCHMARK]}},
+        where: {symbol: {in: [BURSA_BENCHMARK, usBenchmark]}},
         orderBy: {date: "asc"},
     });
 
@@ -99,7 +147,7 @@ async function loadBenchmarkLevels(dates: string[]) {
         .filter((row) => row.symbol === BURSA_BENCHMARK)
         .map((row) => ({date: row.date.getTime(), close: Number(row.close)}));
     const spxPoints = rows
-        .filter((row) => row.symbol === US_BENCHMARK)
+        .filter((row) => row.symbol === usBenchmark)
         .map((row) => ({date: row.date.getTime(), close: Number(row.close)}));
 
     const klci: DailyValue[] = [];
@@ -231,9 +279,9 @@ export async function getSummary(portfolioId: string, userId: string) {
 
 export async function getMetrics(portfolioId: string, userId: string, range: Range) {
     const portfolio = await getOwnedPortfolio(portfolioId, userId);
-    const series = await loadSnapshotSeries(portfolioId, range);
+    const rows = await loadSnapshots(portfolioId, range);
 
-    if (series.length < 3) {
+    if (rows.length < 3) {
         throw new AppError(
             422,
             "INSUFFICIENT_DATA",
@@ -241,16 +289,26 @@ export async function getMetrics(portfolioId: string, userId: string, range: Ran
         );
     }
 
-    const dailyReturns = toDailyReturns(series);
+    // Risk describes the strategy, not the funding. Measuring on raw NAV would
+    // read every deposit as a gain and every withdrawal as a drawdown, so
+    // everything below runs on the cash-flow adjusted, dividend-inclusive series.
+    const twr = await buildTwrSeries(portfolioId, portfolio.baseCurrency, rows);
+    const dailyReturns = toDailyReturns(twr);
     const riskFree = env.RISK_FREE_RATE;
     const portfolioAnnual = annualizedReturn(dailyReturns);
 
-    const startTime = new Date(series[0].date).getTime();
-    const endTime = new Date(series[series.length - 1].date).getTime();
+    const startTime = new Date(rows[0].date).getTime();
+    const endTime = new Date(rows[rows.length - 1].date).getTime();
     const years = (endTime - startTime) / (365.25 * 24 * 60 * 60 * 1000);
 
     const weights = await getBenchmarkWeights(portfolioId, portfolio.baseCurrency);
-    const {pSeries, kSeries, gSeries} = await loadAlignedBenchmark(series, weights, range);
+    const usBenchmark = await resolveUsBenchmark();
+    const {pSeries, kSeries, gSeries} = await loadAlignedBenchmark(
+        twr,
+        weights,
+        range,
+        usBenchmark
+    );
 
     let betaValue = 0;
     let alphaValue = 0;
@@ -268,30 +326,44 @@ export async function getMetrics(portfolioId: string, userId: string, range: Ran
 
     return {
         range,
-        asOf: series[series.length - 1].date,
+        asOf: rows[rows.length - 1].date,
         annualReturn: portfolioAnnual,
-        cagr: years > 0 ? cagr(series[0].value, series[series.length - 1].value, years) : 0,
+        cagr: cagr(twr[0].value, twr[twr.length - 1].value, years),
         volatility: volatility(dailyReturns),
         sharpeRatio: sharpeRatio(dailyReturns, riskFree),
+        sharpeStandardError: sharpeStandardError(dailyReturns, riskFree),
         beta: betaValue,
         alpha: alphaValue,
-        maxDrawdown: maxDrawdown(series),
+        maxDrawdown: maxDrawdown(twr),
+        dividendIncome: rows.reduce((sum, row) => sum + row.income, 0),
+        observations: dailyReturns.length,
+        isLowConfidence: dailyReturns.length < LOW_CONFIDENCE_OBSERVATIONS,
+        usBenchmark,
     };
 }
 
 export async function getPerformance(portfolioId: string, userId: string, range: Range) {
     const portfolio = await getOwnedPortfolio(portfolioId, userId);
-    const nav = await loadSnapshotSeries(portfolioId, range);
+    const rows = await loadSnapshots(portfolioId, range);
 
-    if (nav.length === 0) {
+    if (rows.length === 0) {
         return {range, series: [], benchmarkSeries: [], klciSeries: [], spxSeries: []};
     }
 
+    const nav = toNav(rows);
     const weights = await getBenchmarkWeights(portfolioId, portfolio.baseCurrency);
-    const {pSeries, kSeries, gSeries} = await loadAlignedBenchmark(nav, weights, range);
-    const {klci, spx} = await loadBenchmarkLevels(nav.map((point) => point.date));
-    const cashFlows = await cashFlowBySnapshotDate(portfolioId, portfolio.baseCurrency, nav);
-    const series = timeWeightedIndex(nav, cashFlows);
+    const usBenchmark = await resolveUsBenchmark();
+    const {pSeries, kSeries, gSeries} = await loadAlignedBenchmark(
+        nav,
+        weights,
+        range,
+        usBenchmark
+    );
+    const {klci, spx} = await loadBenchmarkLevels(
+        nav.map((point) => point.date),
+        usBenchmark
+    );
+    const series = await buildTwrSeries(portfolioId, portfolio.baseCurrency, rows);
 
     const benchmarkSeries: {date: string; indexedValue: number}[] = [];
     if (pSeries.length >= 2) {
@@ -316,6 +388,7 @@ export async function getPerformance(portfolioId: string, userId: string, range:
         benchmarkSeries,
         klciSeries: indexTo100(klci),
         spxSeries: indexTo100(spx),
+        usBenchmark,
     };
 }
 

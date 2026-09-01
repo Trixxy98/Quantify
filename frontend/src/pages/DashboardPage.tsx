@@ -30,6 +30,10 @@ export default function DashboardPage() {
     return "Not enough data for this range — sync first or pick a longer range";
   }, [metricsError]);
 
+  const benchmarkHint = metrics
+    ? `vs KLCI / ${metrics.usBenchmark === "^GSPC" ? "S&P 500" : "S&P 500 TR"}`
+    : "vs benchmark";
+
   if (!portfolioId) return null;
 
   return (
@@ -41,6 +45,13 @@ export default function DashboardPage() {
 
       {metricsHint && (
         <p className="text-sm text-[var(--color-text-muted)]">{metricsHint}</p>
+      )}
+
+      {metrics?.isLowConfidence && (
+        <p className="text-sm text-[var(--color-text-muted)]">
+          Only {metrics.observations} daily observations in this range. Sharpe, volatility and beta
+          are estimates, not measurements, at this sample size.
+        </p>
       )}
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -79,6 +90,7 @@ export default function DashboardPage() {
         <MetricCard
           label="Sharpe Ratio"
           value={metrics ? formatNumber(metrics.sharpeRatio) : "—"}
+          hint={metrics ? `± ${formatNumber(metrics.sharpeStandardError)}` : undefined}
           isLoading={isMetricsLoading}
         />
         <MetricCard
@@ -96,16 +108,28 @@ export default function DashboardPage() {
         <MetricCard
           label="Beta"
           value={metrics ? formatNumber(metrics.beta) : "—"}
-          hint="vs benchmark"
+          hint={benchmarkHint}
           isLoading={isMetricsLoading}
         />
         <MetricCard
           label="Alpha"
           value={metrics ? formatPct(metrics.alpha) : "—"}
+          hint={benchmarkHint}
           tone={metrics?.alpha}
           isLoading={isMetricsLoading}
         />
+        <MetricCard
+          label="Dividends"
+          value={metrics ? formatMoney(metrics.dividendIncome, currency) : "—"}
+          hint="Collected in range"
+          isLoading={isMetricsLoading}
+        />
       </section>
+
+      <p className="text-xs text-[var(--color-text-muted)]">
+        Risk figures are measured on the time-weighted, dividend-inclusive return series, so
+        deposits and withdrawals do not count as performance.
+      </p>
 
       <PerformanceChart data={performance} isLoading={isPerformanceLoading} />
       <AllocationChart data={allocation} isLoading={isAllocationLoading} />

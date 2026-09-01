@@ -44,12 +44,14 @@ export function PerformanceChart({ data, isLoading }: Props) {
 
   const showKlci = chartData.some((row) => row.klci != null);
   const showSpx = chartData.some((row) => row.spx != null);
+  const spxLabel = data.usBenchmark === "^GSPC" ? "S&P 500" : "S&P 500 (TR)";
 
   return (
     <div className="rounded-xl bg-[var(--color-surface)] p-5">
       <h2 className="text-sm text-[var(--color-text-muted)]">Performance</h2>
       <p className="text-xs text-[var(--color-text-muted)] mt-1 mb-4">
-        Indexed to 100. Portfolio is time-weighted — adding a position does not look like a gain.
+        Indexed to 100. Portfolio is time-weighted and includes dividends — adding a position does
+        not look like a gain. KLCI is a price index, so it is understated by its dividend yield.
       </p>
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
@@ -94,7 +96,7 @@ export function PerformanceChart({ data, isLoading }: Props) {
               <Line
                 type="monotone"
                 dataKey="spx"
-                name="S&P 500"
+                name={spxLabel}
                 stroke="#a78bfa"
                 dot={false}
                 strokeWidth={2}

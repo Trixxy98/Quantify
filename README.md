@@ -20,7 +20,7 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 - Multiple portfolios (create / rename / delete)
 - Transactions: add, edit, delete — holdings qty and avg cost are replayed from the ledger
 - After a trade: fetch that ticker (and FX/benchmarks if the cache is thin), then rebuild **this** portfolio’s snapshots
-- **Overview** — value, today, unrealized P&L, Sharpe, CAGR, vol, beta, alpha, max drawdown, vs blended KLCI/S&P
+- **Overview** — value, today, unrealized P&L, Sharpe (with its error bar), CAGR, vol, beta, alpha, max drawdown, dividends collected, vs blended KLCI/S&P 500 TR
 - **Analysis** — contribution by name (stock vs FX), variance share, trailing beta; sliders for KLCI / S&P / USD-MYR (linear estimate, not a forecast)
 - **Holdings** — table + price chart with **avg cost** and **max drawdown** (peak → trough in the selected range)
 - **Transactions** — symbol search, close-price fill on trade date
@@ -32,8 +32,8 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 ## How numbers work
 
 1. `Transaction` is the source of truth.
-2. `Holding` is recomputed by replaying buys/sells (weighted avg cost in **native** currency).
-3. Snapshots mark the book daily in **base currency**.
+2. `Holding` is recomputed by replaying buys/sells (weighted avg cost in **native** currency), with share counts restated through any split that happened after the trade.
+3. Snapshots mark the book daily in **base currency**, and record the dividends that went ex that day.
 4. **Unrealized P&L** (Overview, Holdings, allocation) uses:
    - **Cost** at **trade-time** FX
    - **Value** at the **latest** FX  
@@ -41,10 +41,24 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 
 Tickers: `.KL` → Bursa / MYR; anything without a dot → US / USD.
 
+### Return and risk
+
+Every risk figure on Overview is measured on the **time-weighted, dividend-inclusive** return series, never on raw NAV. Deposits and withdrawals are stripped out of the daily return, so paying money in is not a gain and taking money out is not a drawdown. Dividends are added back on the ex-date, so the price drop that day is not read as a loss.
+
+The US benchmark is `^SP500TR`, the total-return version of the index, because comparing a dividend-inclusive portfolio against a price index would hand the portfolio free alpha. `^GSPC` stays in the database for price-vs-price work (per-symbol beta on Analysis, event studies) and is used as a fallback on the chart until a sync has pulled `^SP500TR`.
+
+Sharpe ships with its asymptotic standard error, and Overview says so out loud when a range holds fewer than 60 daily observations. A Sharpe of 1.4 over three months is not a measurement.
+
+### Corporate actions
+
+Yahoo restates its whole price history when a stock splits. Because a sync only rewrites a trailing window, the rows outside that window would keep the old basis and leave a fake cliff in the return series. Each sync therefore compares the oldest stored close against what Yahoo now reports for that same day; if they disagree by more than 0.5% the series was rebased and the full history is rewritten. Splits and dividends are pulled from the start of history regardless of the price window, so a short cron pass cannot miss one.
+
 ## What it is not
 
 - No orders, custody, or live quotes as a trading feed
-- No dividend / corporate-action ledger (total return is incomplete without that)
+- No realized P&L or tax lots: sells reduce the cost base but no gain is booked, and a fully closed position stops being tracked
+- KLCI has no total-return version on Yahoo, so the Bursa leg of the benchmark is still a price index and is understated by roughly its dividend yield
+- Dividends are counted from the ex-date at the gross amount — no withholding tax, no payment-date lag
 - No price prediction or chart-pattern signals
 - IV surface is European Black–Scholes on US listed chains (American options ≈ teaching approx)
 - Event dates are best-effort: FOMC is the official Fed calendar, but earnings dates are derived from Yahoo's 10-Q/10-K list (Yahoo does not publish historical announcement dates) and CPI needs a FRED key
@@ -98,12 +112,13 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 
 ## Scripts
 
-**Backend:** `npm run dev` · `npm run typecheck` · `npm run prisma:migrate` · `npm run prisma:studio` · `npm run events:cpi`
+**Backend:** `npm run dev` · `npm run test` · `npm run typecheck` · `npm run prisma:migrate` · `npm run prisma:studio` · `npm run events:cpi`
 
 **Frontend:** `npm run dev` · `npm run build` · `npm run lint`
 
 ## Notes
 
+- Upgrading an existing database: run `npm run prisma:migrate`, then one **Sync**. Splits, dividends and `^SP500TR` are empty until that pass, so dividends read as zero and the chart falls back to the S&P price index.
 - First save of a **new** ticker waits on Yahoo; editing qty on a known name is mostly a snapshot rebuild.
 - Charts and metrics need price history. If a range is empty, Sync or pick a longer range.
 - Refresh tokens live in client storage (fine for local use, not a production auth story).
