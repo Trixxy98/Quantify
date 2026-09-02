@@ -33,6 +33,10 @@ export type PortfolioSummary = {
     totalCost: number;
     unrealizedPnL: number;
     unrealizedPnLPct: number;
+    realizedPnL: number;
+    realizedPnLPct: number;
+    totalPnL: number;
+    closedLotCount: number;
     todayReturnPct: number;
     todayReturnValue: number;
     asOfDate: string | null;
@@ -160,6 +164,28 @@ export type Transaction = {
     currency: Currency;
     fee: string;
     date: string;
+    realizedPnL: number | null;
+    realizedPnLPct: number | null;
+    realizedPnLBase: number | null;
+    closedPosition: boolean;
+};
+
+export type ClosedLot = {
+    symbol: string;
+    currency: Currency;
+    openedAt: string;
+    closedAt: string;
+    quantity: number;
+    cost: number;
+    proceeds: number;
+    realizedPnL: number;
+    realizedPnLPct: number;
+    realizedPnLBase: number;
+};
+
+export type ClosedLotsResponse = {
+    baseCurrency: Currency;
+    lots: ClosedLot[];
 };
 
 export type TransactionListResponse = {

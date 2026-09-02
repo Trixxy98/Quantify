@@ -5,6 +5,7 @@ import type {
   UpdateTransactionInput,
   Holding,
   HoldingPriceSeries,
+  ClosedLotsResponse,
   Portfolio,
   PortfolioAllocation,
   PortfolioAnalysis,
@@ -66,6 +67,11 @@ export async function getPortfolioAnalysis(portfolioId: string, range: Range): P
 
 export async function listHoldings(portfolioId: string): Promise<Holding[]> {
   const { data } = await apiClient.get<Holding[]>(`/portfolios/${portfolioId}/holdings`);
+  return data;
+}
+
+export async function listClosedLots(portfolioId: string): Promise<ClosedLotsResponse> {
+  const { data } = await apiClient.get<ClosedLotsResponse>(`/portfolios/${portfolioId}/closed-lots`);
   return data;
 }
 

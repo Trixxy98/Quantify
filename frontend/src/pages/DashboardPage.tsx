@@ -76,6 +76,26 @@ export default function DashboardPage() {
           isLoading={isSummaryLoading}
         />
         <MetricCard
+          label="Realized P&L"
+          value={summary ? formatMoney(summary.realizedPnL, currency) : "—"}
+          hint={
+            summary
+              ? `${formatPct(summary.realizedPnLPct)} · ${summary.closedLotCount} closed lot${
+                  summary.closedLotCount === 1 ? "" : "s"
+                }`
+              : undefined
+          }
+          tone={summary?.realizedPnL}
+          isLoading={isSummaryLoading}
+        />
+        <MetricCard
+          label="Total P&L"
+          value={summary ? formatMoney(summary.totalPnL, currency) : "—"}
+          hint="Unrealized + realized"
+          tone={summary?.totalPnL}
+          isLoading={isSummaryLoading}
+        />
+        <MetricCard
           label="Annual Return"
           value={metrics ? formatPct(metrics.annualReturn) : "—"}
           tone={metrics?.annualReturn}

@@ -19,6 +19,7 @@ portfolioRouter.patch("/:id", validate(updatePortfolioSchema), portfolioControll
 portfolioRouter.delete("/:id", portfolioController.deletePortfolioHandler);
 
 portfolioRouter.get("/:id/holdings", portfolioController.listHoldingsHandler);
+portfolioRouter.get("/:id/closed-lots", portfolioController.listClosedLotsHandler);
 portfolioRouter.get("/:id/summary", portfolioController.getSummaryHandler);
 portfolioRouter.get("/:id/metrics", portfolioController.getMetricsHandler);
 portfolioRouter.get("/:id/performance", portfolioController.getPerformanceHandler);

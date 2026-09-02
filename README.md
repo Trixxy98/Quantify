@@ -24,7 +24,7 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 - After a trade: fetch that ticker (and FX/benchmarks if the cache is thin), then rebuild **this** portfolio’s snapshots
 - **Overview** — value, today, unrealized P&L, Sharpe (with its error bar), CAGR, vol, beta, alpha, max drawdown, dividends collected, vs blended KLCI/S&P 500 TR
 - **Analysis** — contribution by name (stock vs FX), variance share, trailing beta; sliders for KLCI / S&P / USD-MYR (linear estimate, not a forecast)
-- **Holdings** — table + price chart with **avg cost** and **max drawdown** (peak → trough in the selected range)
+- **Holdings** — table + price chart with **avg cost** and **max drawdown** (peak → trough in the selected range); closed lots with realized P&L
 - **Transactions** — symbol search, close-price fill on trade date
 - **Vol** — US options chain, Black–Scholes implied vol (Newton + bisection), 3D surface + skew/term slices
 - **Events** — event study around Fed days, CPI releases and earnings: market-model abnormal returns, CAR with a ±2 s.e. band, event-day vs other-day return distributions, and an event-only trading rule
@@ -40,6 +40,7 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
    - **Cost** at **trade-time** FX
    - **Value** at the **latest** FX  
    Same definition everywhere. Avg cost on the holdings table stays native (e.g. RM for `.KL`).
+5. **Realized P&L** is weighted-average on each sell: proceeds minus the average cost of the shares sold (buy fees in cost, sell fees against proceeds). A **closed lot** is a round trip — first buy after flat until the position is sold to zero. Partial sells still book realized P&L; they just do not emit a lot until the book is flat. Closed symbols stay on the price sync list so the chart does not go blank after you sell out.
 
 Tickers: `.KL` → Bursa / MYR; anything without a dot → US / USD.
 
@@ -58,7 +59,7 @@ Yahoo restates its whole price history when a stock splits. Because a sync only 
 ## What it is not
 
 - No orders, custody, or live quotes as a trading feed
-- No realized P&L or tax lots: sells reduce the cost base but no gain is booked, and a fully closed position stops being tracked
+- No FIFO tax lots: realized P&L is weighted average, which is what the holdings table already uses
 - KLCI has no total-return version on Yahoo, so the Bursa leg of the benchmark is still a price index and is understated by roughly its dividend yield
 - Dividends are counted from the ex-date at the gross amount — no withholding tax, no payment-date lag
 - No price prediction or chart-pattern signals
@@ -106,7 +107,7 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 | POST | `/api/auth/register` `login` `refresh` `logout` | |
 | CRUD | `/api/portfolios` | |
 | GET | `/api/portfolios/:id/summary` `metrics` `performance` `allocation` `analysis` | `?range=` `1M` `3M` `6M` `1Y` `YTD` `ALL` |
-| GET | `/api/portfolios/:id/holdings` `transactions` `prices/:symbol` | |
+| GET | `/api/portfolios/:id/holdings` `closed-lots` `transactions` `prices/:symbol` | |
 | POST/PATCH/DELETE | `/api/portfolios/:id/transactions` | Edit/delete recomputes holdings |
 | GET | `/api/market/search` `close` `iv-surface` | Yahoo search; close; US options IV surface |
 | GET | `/api/events/study` | `?symbols=` `type=FOMC\|CPI\|EARNINGS` `pre=` `post=` `years=` `hold=` |

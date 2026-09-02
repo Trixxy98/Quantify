@@ -2,6 +2,7 @@ import {Currency, Exchange, Prisma, TransactionType} from "@prisma/client";
 import {prisma} from "../lib/prisma";
 import {AppError} from "../utils/AppError";
 import {adjustTrade} from "./corporateActions";
+import {realizePortfolio} from "./lots.service";
 import {refreshPortfolioAfterTradeQuietly} from "./refresh.service";
 import {markOpenPositions} from "./valuation.service";
 
@@ -237,7 +238,7 @@ export async function listTransactions(
 
     const where = {portfolioId, ...(opts.symbol ? {symbol: opts.symbol.toUpperCase()} : {})};
 
-    const [data, total] = await prisma.$transaction([
+    const [data, total, realized] = await prisma.$transaction([
         prisma.transaction.findMany({
             where,
             orderBy: [{date: "desc"}, {createdAt: "desc"}],
@@ -245,10 +246,24 @@ export async function listTransactions(
             take: opts.limit,
         }),
         prisma.transaction.count({where}),
+        prisma.portfolio.findUnique({where: {id: portfolioId}, select: {baseCurrency: true}}),
     ]);
 
+    const {sells} = realized
+        ? await realizePortfolio(portfolioId, realized.baseCurrency)
+        : {sells: new Map()};
+
     return {
-        data,
+        data: data.map((row) => {
+            const sell = sells.get(row.id);
+            return {
+                ...row,
+                realizedPnL: sell?.realizedPnL ?? null,
+                realizedPnLPct: sell?.realizedPnLPct ?? null,
+                realizedPnLBase: sell?.realizedPnLBase ?? null,
+                closedPosition: sell?.closedPosition ?? false,
+            };
+        }),
         pagination: {
             page: opts.page,
             limit: opts.limit,
@@ -256,4 +271,10 @@ export async function listTransactions(
             totalPages: Math.ceil(total / opts.limit),
         },
     };
+}
+
+export async function listClosedLots(portfolioId: string, userId: string) {
+    const portfolio = await getOwnedPortfolio(portfolioId, userId);
+    const {lots} = await realizePortfolio(portfolioId, portfolio.baseCurrency);
+    return {baseCurrency: portfolio.baseCurrency, lots};
 }
