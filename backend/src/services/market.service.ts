@@ -91,11 +91,11 @@ async function saveCorporateActions(symbol: string, events: ChartEvents) {
 }
 
 export async function getTrackedSymbols(): Promise<string[]> {
-    const holdings = await prisma.holding.findMany({
-        select: {symbol: true},
-        distinct: ["symbol"],
-    });
-    return holdings.map((h) => h.symbol);
+    const [holdings, trades] = await Promise.all([
+        prisma.holding.findMany({select: {symbol: true}, distinct: ["symbol"]}),
+        prisma.transaction.findMany({select: {symbol: true}, distinct: ["symbol"]}),
+    ]);
+    return [...new Set([...holdings, ...trades].map((row) => row.symbol))].sort();
 }
 
 export async function syncDailyPrices(symbol: string, from: Date) {

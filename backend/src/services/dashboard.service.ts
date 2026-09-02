@@ -20,6 +20,7 @@ import {
 import {currencyFromSymbol} from "./market.service";
 import {getOwnedPortfolio} from "./portfolio.service";
 import {markOpenPositions} from "./valuation.service";
+import {realizePortfolio} from "./lots.service";
 import {latestAtOrBefore, loadUsdMyrSeries, toBase} from "./fx";
 import {type Range, resolveRangeStart, toDateKey} from "../utils/dateRange";
 
@@ -207,6 +208,17 @@ async function cashFlowBySnapshotDate(
     return flows;
 }
 
+async function realizedTotals(portfolioId: string, baseCurrency: Currency) {
+    const {sells, lots} = await realizePortfolio(portfolioId, baseCurrency);
+    const realizedPnL = [...sells.values()].reduce((sum, row) => sum + row.realizedPnLBase, 0);
+    const realizedCost = [...sells.values()].reduce((sum, row) => sum + row.costBase, 0);
+    return {
+        realizedPnL,
+        realizedPnLPct: realizedCost > 0 ? realizedPnL / realizedCost : 0,
+        closedLotCount: lots.length,
+    };
+}
+
 export async function getSummary(portfolioId: string, userId: string) {
     const portfolio = await getOwnedPortfolio(portfolioId, userId);
     const marks = await markOpenPositions(portfolioId, portfolio.baseCurrency);
@@ -217,6 +229,8 @@ export async function getSummary(portfolioId: string, userId: string) {
         orderBy: {date: "desc"},
         take: 8,
     });
+
+    const realized = await realizedTotals(portfolioId, portfolio.baseCurrency);
 
     if (priced.length === 0) {
         const current = snapshots[0];
@@ -229,6 +243,10 @@ export async function getSummary(portfolioId: string, userId: string) {
                 totalCost: 0,
                 unrealizedPnL: 0,
                 unrealizedPnLPct: 0,
+                realizedPnL: realized.realizedPnL,
+                realizedPnLPct: realized.realizedPnLPct,
+                totalPnL: realized.realizedPnL,
+                closedLotCount: realized.closedLotCount,
                 todayReturnPct: 0,
                 todayReturnValue: 0,
                 asOfDate: null,
@@ -237,14 +255,19 @@ export async function getSummary(portfolioId: string, userId: string) {
         const totalValue = Number(current.totalValue);
         const totalCost = Number(current.totalCost);
         const prevValue = snapshots[1] ? Number(snapshots[1].totalValue) : totalValue;
+        const unrealizedPnL = totalValue - totalCost;
         return {
             portfolioId,
             name: portfolio.name,
             baseCurrency: portfolio.baseCurrency,
             totalValue,
             totalCost,
-            unrealizedPnL: totalValue - totalCost,
-            unrealizedPnLPct: totalCost > 0 ? (totalValue - totalCost) / totalCost : 0,
+            unrealizedPnL,
+            unrealizedPnLPct: totalCost > 0 ? unrealizedPnL / totalCost : 0,
+            realizedPnL: realized.realizedPnL,
+            realizedPnLPct: realized.realizedPnLPct,
+            totalPnL: unrealizedPnL + realized.realizedPnL,
+            closedLotCount: realized.closedLotCount,
             todayReturnPct: prevValue > 0 ? (totalValue - prevValue) / prevValue : 0,
             todayReturnValue: totalValue - prevValue,
             asOfDate: toDateKey(current.date),
@@ -262,6 +285,7 @@ export async function getSummary(portfolioId: string, userId: string) {
     const asOfTime = asOfDate ? Date.parse(`${asOfDate}T00:00:00.000Z`) : NaN;
     const prev = snapshots.find((s) => (Number.isNaN(asOfTime) ? true : s.date.getTime() < asOfTime));
     const prevValue = prev ? Number(prev.totalValue) : totalValue;
+    const unrealizedPnL = totalValue - totalCost;
 
     return {
         portfolioId,
@@ -269,8 +293,12 @@ export async function getSummary(portfolioId: string, userId: string) {
         baseCurrency: portfolio.baseCurrency,
         totalValue,
         totalCost,
-        unrealizedPnL: totalValue - totalCost,
-        unrealizedPnLPct: totalCost > 0 ? (totalValue - totalCost) / totalCost : 0,
+        unrealizedPnL,
+        unrealizedPnLPct: totalCost > 0 ? unrealizedPnL / totalCost : 0,
+        realizedPnL: realized.realizedPnL,
+        realizedPnLPct: realized.realizedPnLPct,
+        totalPnL: unrealizedPnL + realized.realizedPnL,
+        closedLotCount: realized.closedLotCount,
         todayReturnPct: prevValue > 0 ? (totalValue - prevValue) / prevValue : 0,
         todayReturnValue: totalValue - prevValue,
         asOfDate,

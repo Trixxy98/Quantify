@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteTransaction } from "../../api/portfolio.api";
 import { useTransactions } from "../../hooks/useTransactions";
-import { formatMoney } from "../../utils/format";
+import { formatMoney, formatPct, toneClass } from "../../utils/format";
 import type { Transaction } from "../../types/api.types";
 
 type Props = {
@@ -46,6 +46,7 @@ export function TransactionsTable({ portfolioId, editingId, onEdit }: Props) {
               <th className="pb-2 font-medium text-right">Qty</th>
               <th className="pb-2 font-medium text-right">Price</th>
               <th className="pb-2 font-medium text-right">Fee</th>
+              <th className="pb-2 font-medium text-right">Realized</th>
               <th className="pb-2 font-medium" />
             </tr>
           </thead>
@@ -63,6 +64,19 @@ export function TransactionsTable({ portfolioId, editingId, onEdit }: Props) {
                 <td className="py-2 text-right">{Number(tx.quantity).toLocaleString()}</td>
                 <td className="py-2 text-right">{formatMoney(Number(tx.price), tx.currency)}</td>
                 <td className="py-2 text-right">{formatMoney(Number(tx.fee), tx.currency)}</td>
+                <td className={`py-2 text-right ${tx.realizedPnL != null ? toneClass(tx.realizedPnL) : ""}`}>
+                  {tx.type === "SELL" && tx.realizedPnL != null ? (
+                    <>
+                      <div>{formatMoney(tx.realizedPnL, tx.currency)}</div>
+                      <div className="text-xs text-[var(--color-text-muted)]">
+                        {formatPct(tx.realizedPnLPct ?? 0)}
+                        {tx.closedPosition ? " · closed" : ""}
+                      </div>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </td>
                 <td className="py-2 text-right whitespace-nowrap">
                   <button
                     type="button"

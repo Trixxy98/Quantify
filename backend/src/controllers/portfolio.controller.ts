@@ -35,6 +35,11 @@ export async function listHoldingsHandler(req: Request, res: Response) {
     res.json(holdings);  
 }
 
+export async function listClosedLotsHandler(req: Request, res: Response) {
+    const result = await portfolioService.listClosedLots(req.params.id, req.userId!);
+    res.json(result);
+}
+
 export async function listTransactionsHandler(req: Request, res: Response) {
     const query = listTransactionsQuerySchema.parse(req.query);
     const result = await portfolioService.listTransactions(req.params.id, req.userId!, query);
