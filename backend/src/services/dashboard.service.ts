@@ -468,3 +468,20 @@ export async function getPriceSeries(
     };
 }
 
+
+/** Time-weighted path plus the benchmark aligned to it. Used by the risk book. */
+export async function loadRiskPath(portfolioId: string, userId: string, range: Range) {
+    const portfolio = await getOwnedPortfolio(portfolioId, userId);
+    const rows = await loadSnapshots(portfolioId, range);
+    const weights = await getBenchmarkWeights(portfolioId, portfolio.baseCurrency);
+    const usBenchmark = await resolveUsBenchmark();
+    const empty = {pSeries: [] as DailyValue[], kSeries: [] as DailyValue[], gSeries: [] as DailyValue[]};
+
+    if (rows.length < 2) {
+        return {baseCurrency: portfolio.baseCurrency, twr: [] as DailyValue[], weights, usBenchmark, aligned: empty};
+    }
+
+    const twr = await buildTwrSeries(portfolioId, portfolio.baseCurrency, rows);
+    const aligned = await loadAlignedBenchmark(twr, weights, range, usBenchmark);
+    return {baseCurrency: portfolio.baseCurrency, twr, weights, usBenchmark, aligned};
+}

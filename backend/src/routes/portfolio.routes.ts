@@ -25,6 +25,7 @@ portfolioRouter.get("/:id/metrics", portfolioController.getMetricsHandler);
 portfolioRouter.get("/:id/performance", portfolioController.getPerformanceHandler);
 portfolioRouter.get("/:id/allocation", portfolioController.getAllocationHandler);
 portfolioRouter.get("/:id/analysis", portfolioController.getAnalysisHandler);
+portfolioRouter.get("/:id/risk", portfolioController.getRiskHandler);
 portfolioRouter.get("/:id/prices/:symbol", portfolioController.getPriceSeriesHandler);
 
 portfolioRouter.get("/:id/transactions", portfolioController.listTransactionsHandler);
