@@ -125,6 +125,58 @@ export type PortfolioAnalysis = {
     };
 };
 
+export type RiskName = {
+    symbol: string;
+    weight: number;
+    closeToCloseVol: number;
+    gkVol: number;
+    beta: number | null;
+    mctr: number | null;
+    cctr: number | null;
+    riskShare: number | null;
+}
+
+export type PortfolioRisk = {
+    range: Range;
+    asOf: string | null;
+    baseCurrency: Currency;
+    observations: number;
+    isLowConfidence: boolean;
+    usBenchmark: string;
+    notes: string[];
+    path: {
+        volatility: number;
+        maxDrawdown: number;
+        calmar: number | null;
+        ulcer: number;
+        var95: number | null;
+        var99: number | null;
+        es95: number | null;
+        es99: number | null;
+        kupiec: {
+            p: number;
+            window: number;
+            trials: number;
+            breaches: number;
+            expected: number;
+            likelihoodRatio: number;
+            rejectAt5Pct: boolean;
+        } | null;
+    };
+    names: RiskName[];
+    correlation: {symbols: string[]; matrix: number[][]};
+    underwater: {date: string; drawdown: number}[];
+    rolling: {date: string; vol: number; beta: number}[];
+    drawdowns: {
+        peak: string;
+        trough: string;
+        recovered: string | null;
+        depth: number;
+        daysToTrough: number;
+        daysToRecover: number | null;
+    }[];
+};
+
 export type PricePoint = {date: string; close: number};
 
 export type HoldingPriceSeries = {

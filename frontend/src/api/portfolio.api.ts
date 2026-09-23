@@ -14,6 +14,7 @@ import type {
   PortfolioSummary,
   Range,
   TransactionListResponse,
+  PortfolioRisk,
 } from "../types/api.types";
 
 export async function createTransaction(portfolioId: string, input: CreateTransactionInput) {
@@ -127,4 +128,11 @@ export async function updateTransaction(
 
 export async function deleteTransaction(portfolioId: string, transactionId: string): Promise<void> {
   await apiClient.delete(`/portfolios/${portfolioId}/transactions/${transactionId}`);
+}
+
+export async function getPortfolioRisk(portfolioId: string, range: Range): Promise<PortfolioRisk> {
+  const {data} = await apiClient.get<PortfolioRisk>(`/portfolios/${portfolioId}/risk`, {
+    params: {range},
+  });
+  return data;
 }

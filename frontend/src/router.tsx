@@ -9,6 +9,7 @@ import RegisterPage from "./pages/RegisterPage";
 import EventsPage from "./pages/EventsPage";
 import VolPage from "./pages/VolPage";
 import TransactionsPage from "./pages/TransactionsPage";
+import RiskPage from "./pages/RiskPage";
 
 export function AppRoutes() {
   return (
@@ -19,6 +20,7 @@ export function AppRoutes() {
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/analysis" element={<AnalysisPage />} />
+          <Route path="/risk" element={<RiskPage />} />
           <Route path="/holdings" element={<HoldingsPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/vol" element={<VolPage />} />

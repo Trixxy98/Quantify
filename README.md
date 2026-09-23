@@ -22,6 +22,7 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 - After a trade: fetch that ticker (and FX/benchmarks if the cache is thin), then rebuild **this** portfolio’s snapshots
 - **Overview** — value, today, unrealized P&L, Sharpe (with its error bar), CAGR, vol, beta, alpha, max drawdown, dividends collected, vs blended KLCI/S&P 500 TR
 - **Analysis** — contribution by name (stock vs FX), variance share, trailing beta; sliders for KLCI / S&P / USD-MYR (linear estimate, not a forecast)
+- **Risk** — correlation, Garman–Klass vs close-to-close vol, marginal and component risk, historical VaR / expected shortfall with a Kupiec breach test, underwater chart and worst drawdowns
 - **Holdings** — table + price chart with **avg cost** and **max drawdown** (peak → trough in the selected range); closed lots with realized P&L
 - **Transactions** — symbol search, close-price fill on trade date
 - **Vol** — US options chain, Black–Scholes implied vol (Newton + bisection), 3D surface + skew/term slices

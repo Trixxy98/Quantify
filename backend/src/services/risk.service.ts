@@ -49,7 +49,6 @@ export async function getRisk(portfolioId: string, userId: string, range: Range)
     const totalValue = priced.reduce((sum, mark) => sum + mark.marketValue!, 0);
 
     const twrReturns = toDailyReturns(path.twr);
-    const twrDates = path.twr.slice(1).map((point) => point.date);
     const maxDd = path.twr.length > 1 ? maxDrawdown(path.twr) : 0;
     const annual = twrReturns.length > 0 ? annualizedReturn(twrReturns) : 0;
 
@@ -182,7 +181,7 @@ async function nameRisk(
 
     const columns = usable.map((symbol) => {
         const bars = new Map((bySymbol.get(symbol) ?? []).map((bar) => [bar.date, bar.close]));
-        return returnDates.map((date, index) => {
+        return returnDates.map((date) => {
             const prev = bars.get(overlap[overlap.indexOf(date) - 1])!;
             const curr = bars.get(date)!;
             return prev > 0 ? (curr - prev) / prev : 0;
