@@ -17,6 +17,7 @@ export type AppShellContext = {
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Overview" },
   { to: "/analysis", label: "Analysis" },
+  { to: "/risk", label: "Risk" },
   { to: "/holdings", label: "Holdings" },
   { to: "/transactions", label: "Transactions" },
   { to: "/vol", label: "Vol" },
