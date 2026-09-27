@@ -32,4 +32,9 @@ export const listTransactionsQuerySchema = z.object({
 
 export const rangeQuerySchema = z.object({
     range: z.enum(["1M", "3M", "6M", "1Y", "YTD", "ALL"]).default("1Y"),
+    window: z.coerce
+        .number()
+        .pipe(z.union([z.literal(20), z.literal(60), z.literal(120)]))
+        .optional()
+        .default(60),
 });

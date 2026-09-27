@@ -42,7 +42,7 @@ function betaTo(stock: number[], bench: number[]): number | null {
     return covariance(stock, bench) / benchVar;
 }
 
-export async function getRisk(portfolioId: string, userId: string, range: Range) {
+export async function getRisk(portfolioId: string, userId: string, range: Range, window = 60) {
     const path = await loadRiskPath(portfolioId, userId, range);
     const marks = await markOpenPositions(portfolioId, path.baseCurrency);
     const priced = marks.filter((mark) => mark.marketValue != null && mark.marketValue > 0);
@@ -121,7 +121,7 @@ export async function getRisk(portfolioId: string, userId: string, range: Range)
         names: names.rows,
         correlation: names.correlation,
         underwater,
-        rolling: rollingVolBeta(alignedPortReturns, benchReturns, benchDates, ROLLING),
+        rolling: rollingVolBeta(alignedPortReturns, benchReturns, benchDates, window),
         drawdowns: drawdownEpisodes(path.twr),
     };
 }

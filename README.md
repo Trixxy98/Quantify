@@ -23,6 +23,7 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 - **Overview** — value, today, unrealized P&L, Sharpe (with its error bar), CAGR, vol, beta, alpha, max drawdown, dividends collected, vs blended KLCI/S&P 500 TR
 - **Analysis** — contribution by name (stock vs FX), variance share, trailing beta; sliders for KLCI / S&P / USD-MYR (linear estimate, not a forecast)
 - **Risk** — correlation, Garman–Klass vs close-to-close vol, marginal and component risk, historical VaR / expected shortfall with a Kupiec breach test, underwater chart and worst drawdowns
+- **Chart** — compose portfolio, KLCI, S&P 500 TR, a holding, drawdown, and rolling vol/beta on two axes; save the layout in the browser
 - **Holdings** — table + price chart with **avg cost** and **max drawdown** (peak → trough in the selected range); closed lots with realized P&L
 - **Transactions** — symbol search, close-price fill on trade date
 - **Vol** — US options chain, Black–Scholes implied vol (Newton + bisection), 3D surface + skew/term slices
@@ -105,7 +106,7 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 | --- | --- | --- |
 | POST | `/api/auth/register` `login` `refresh` `logout` | |
 | CRUD | `/api/portfolios` | |
-| GET | `/api/portfolios/:id/summary` `metrics` `performance` `allocation` `analysis` | `?range=` `1M` `3M` `6M` `1Y` `YTD` `ALL` |
+| GET | `/api/portfolios/:id/summary` `metrics` `performance` `allocation` `analysis` `risk` | `?range=` `1M` `3M` `6M` `1Y` `YTD` `ALL`. Risk also takes `?window=` `20` `60` `120` |
 | GET | `/api/portfolios/:id/holdings` `closed-lots` `transactions` `prices/:symbol` | |
 | POST/PATCH/DELETE | `/api/portfolios/:id/transactions` | Edit/delete recomputes holdings |
 | GET | `/api/market/search` `close` `iv-surface` | Yahoo search; close; US options IV surface |

@@ -130,9 +130,13 @@ export async function deleteTransaction(portfolioId: string, transactionId: stri
   await apiClient.delete(`/portfolios/${portfolioId}/transactions/${transactionId}`);
 }
 
-export async function getPortfolioRisk(portfolioId: string, range: Range): Promise<PortfolioRisk> {
+export async function getPortfolioRisk(
+  portfolioId: string,
+  range: Range,
+  window: 20 | 60 | 120 = 60
+): Promise<PortfolioRisk> {
   const {data} = await apiClient.get<PortfolioRisk>(`/portfolios/${portfolioId}/risk`, {
-    params: {range},
+    params: {range, window},
   });
   return data;
 }

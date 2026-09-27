@@ -107,7 +107,7 @@ export async function getPriceSeriesHandler(req: Request, res: Response) {
 }
 
 export async function getRiskHandler(req: Request, res: Response) {
-    const {range} = rangeQuerySchema.parse(req.query);
-    const result = await riskService.getRisk(req.params.id, req.userId!, range);
+    const {range, window} = rangeQuerySchema.parse(req.query);
+    const result = await riskService.getRisk(req.params.id, req.userId!, range, window);
     res.json(result);
 }
