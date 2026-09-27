@@ -371,3 +371,96 @@ export type EventStudy = {
     };
     notes: string[];
 };
+
+export type VariancePremiumMove = {
+    date: string;
+    move: number;
+};
+
+export type VariancePremium = {
+    symbol: string;
+    eventType: EventType;
+    years: number;
+    nextEvent: string | null;
+    expiry: string | null;
+    expiryBefore: string | null;
+    spot: number | null;
+    atmIv: number | null;
+    impliedMove: number | null;
+    method: "term-structure" | "straddle" | null;
+    moves: VariancePremiumMove[];
+    stats: {
+        n: number;
+        medianAbs: number | null;
+        meanAbs: number | null;
+        gap: number | null;
+        percentile: number | null;
+    };
+    ivHistory: {
+        n: number;
+        since: string;
+        current: number;
+        low: number;
+        high: number;
+        rank: number;
+        percentile: number;
+        expiry: string;
+    } | null;
+    notes: string[];
+};
+
+export type FactorLoading = {
+    factor: string;
+    beta: number;
+    se: number;
+    tStat: number;
+};
+
+export type FactorExposure = {
+    symbols: string[];
+    n: number;
+    dataThrough: string | null;
+    alpha: number | null;
+    alphaSe: number | null;
+    alphaT: number | null;
+    rSquared: number | null;
+    loadings: FactorLoading[] | null;
+    rolling: {date: string; alpha: number; loadings: {factor: string; beta: number}[]}[];
+    notes: string[];
+};
+
+export type MomentumStats = {
+    annualizedReturn: number;
+    volatility: number;
+    sharpe: number;
+    sharpeSe: number;
+    maxDrawdown: number;
+    hitRate: number | null;
+    avgTurnover: number | null;
+};
+
+export type MomentumStudy = {
+    universe: "holdings" | "basket";
+    basketAsOf: string | null;
+    symbols: string[];
+    allowShort: boolean;
+    commissionBps: number;
+    slippageBps: number;
+    longCount: number;
+    shortCount: number;
+    latestLong: string[];
+    conclusion: string;
+    from: string | null;
+    to: string | null;
+    n: number;
+    strategy: MomentumStats | null;
+    buyHold: MomentumStats | null;
+    equalWeight: MomentumStats | null;
+    benchmark: MomentumStats | null;
+    benchmarkSymbol: string | null;
+    alpha: {annualized: number; se: number; tStat: number; n: number} | null;
+    equity: {date: string; strategy: number; buyHold: number; equalWeight: number; benchmark: number | null}[];
+    excess: {date: string; value: number}[];
+    turnover: {month: string; turnover: number}[];
+    notes: string[];
+};

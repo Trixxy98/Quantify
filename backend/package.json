@@ -15,6 +15,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
     "events:cpi": "tsx scripts/fetchCpiDates.ts",
+    "factors:refresh": "tsx scripts/refreshFactors.ts",
     "prisma:studio": "prisma studio"
   },
   "dependencies": {

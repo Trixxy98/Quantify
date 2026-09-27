@@ -18,6 +18,9 @@ const NAV_ITEMS = [
   { to: "/dashboard", label: "Overview" },
   { to: "/analysis", label: "Analysis" },
   { to: "/risk", label: "Risk" },
+  { to: "/factors", label: "Factors" },
+  { to: "/research", label: "Research" },
+  { to: "/chart", label: "Chart" },
   { to: "/holdings", label: "Holdings" },
   { to: "/transactions", label: "Transactions" },
   { to: "/vol", label: "Vol" },
@@ -83,7 +86,7 @@ export function AppShell() {
   return (
     <div className="min-h-screen">
       <header className="border-b border-slate-800">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-6">
+        <div className="flex h-14 items-center justify-between gap-4 px-6">
           <div className="flex min-w-0 items-center gap-3">
             <Link to="/dashboard" className="shrink-0 text-base font-semibold tracking-wide">
               Quantify
@@ -185,7 +188,7 @@ export function AppShell() {
         </div>
 
         <div className="border-t border-slate-800/70">
-          <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-6 py-2">
+          <nav className="flex gap-1 overflow-x-auto px-6 py-2">
             {NAV_ITEMS.map((item) => (
               <NavLink key={item.to} to={item.to} className={navClass}>
                 {item.label}
@@ -195,7 +198,7 @@ export function AppShell() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 pt-6 pb-28 space-y-8">
+      <main className="px-6 pt-6 pb-28 space-y-8">
         {!isPortfoliosLoading && !portfolioId && (
           <CreatePortfolioForm onCreated={setSelectedId} />
         )}

@@ -59,7 +59,7 @@ export function TickerTape() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-800 bg-[var(--color-bg)]">
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-6">
+      <div className="flex items-center gap-4 px-6">
         <span className="flex shrink-0 items-center gap-2 text-sm text-[var(--color-text-muted)]">
           <span
             className={`h-2.5 w-2.5 rounded-full ${

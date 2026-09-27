@@ -25,12 +25,15 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 - **Overview** — value, today, unrealized P&L, Sharpe (with its error bar), CAGR, vol, beta, alpha, max drawdown, dividends collected, vs blended KLCI/S&P 500 TR
 - **Analysis** — contribution by name (stock vs FX), variance share, trailing beta; sliders for KLCI / S&P / USD-MYR (linear estimate, not a forecast)
 - **Risk** — correlation, Garman–Klass vs close-to-close vol, marginal and component risk, historical VaR / expected shortfall with a Kupiec breach test, underwater chart and worst drawdowns
+- **Factors** — Fama–French five-factor plus momentum regression of the US sleeve (USD), Newey–West t-stats, rolling 252-day loadings. Bursa holdings are excluded
+- **Research** — 12-1 cross-sectional momentum on a fixed US large-cap basket or the portfolio's US holdings. Monthly, top third, walk-forward, after commission and slippage, against buy-and-hold, equal weight, and the S&P 500 total return
+- **Chart** — compose portfolio, KLCI, S&P 500 TR, a holding, drawdown, and rolling vol/beta on two axes; save the layout in the browser
 - **Holdings** — table + price chart with **avg cost** and **max drawdown** (peak → trough in the selected range); closed lots with realized P&L
 - **Transactions** — symbol search, close-price fill on trade date
 - **Vol** — US options chain, Black–Scholes implied vol (Newton + bisection), 3D surface + skew/term slices
-- **Events** — event study around Fed days, CPI releases and earnings: market-model abnormal returns, CAR with a ±2 s.e. band, event-day vs other-day return distributions, and an event-only trading rule
+- **Events** — event study around Fed days, CPI releases and earnings: market-model abnormal returns, CAR with a ±2 s.e. band, event-day vs other-day return distributions, an event-only trading rule, and today's ATM straddle versus the median realized move on past events (not a historical IV backtest)
 - Manual **Sync** still exists for a full market pass
-- Daily cron: 6:30am MYT, Tue–Sat (after the US close)
+- Daily cron: 6:30am MYT, Tue–Sat (after the US close). It also records the front-month ATM implied vol of every US name (plus SPY) into `ImpliedSnapshot`, because Yahoo serves only today's chain — IV rank on the Events page is built from these rows and stays blank until 20 sessions exist
 
 ## How numbers work
 
@@ -63,7 +66,7 @@ Yahoo restates its whole price history when a stock splits. Because a sync only 
 - No FIFO tax lots: realized P&L is weighted average, which is what the holdings table already uses
 - KLCI has no total-return version on Yahoo, so the Bursa leg of the benchmark is still a price index and is understated by roughly its dividend yield
 - Dividends are counted from the ex-date at the gross amount — no withholding tax, no payment-date lag
-- No price prediction or chart-pattern signals
+- No chart-pattern or discretionary signals. The one tested rule is 12-1 momentum, walk-forward and after costs, and the Research page states when it loses to buy-and-hold
 - IV surface is European Black–Scholes on US listed chains (American options ≈ teaching approx)
 - Event dates are best-effort: FOMC is the official Fed calendar, but earnings dates are derived from Yahoo's 10-Q/10-K list (Yahoo does not publish historical announcement dates) and CPI needs a FRED key
 - Scenario shocks are `weight × beta × index + FX sensitivity`, not a model
@@ -107,16 +110,18 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 | --- | --- | --- |
 | POST | `/api/auth/register` `login` `refresh` `logout` | |
 | CRUD | `/api/portfolios` | |
-| GET | `/api/portfolios/:id/summary` `metrics` `performance` `allocation` `analysis` | `?range=` `1M` `3M` `6M` `1Y` `YTD` `ALL` |
+| GET | `/api/portfolios/:id/summary` `metrics` `performance` `allocation` `analysis` `risk` `factors` | `?range=` `1M` `3M` `6M` `1Y` `YTD` `ALL`. Risk also takes `?window=` `20` `60` `120` |
 | GET | `/api/portfolios/:id/holdings` `closed-lots` `transactions` `prices/:symbol` | |
 | POST/PATCH/DELETE | `/api/portfolios/:id/transactions` | Edit/delete recomputes holdings |
 | GET | `/api/market/search` `close` `iv-surface` | Yahoo search; close; US options IV surface |
 | GET | `/api/events/study` | `?symbols=` `type=FOMC\|CPI\|EARNINGS` `pre=` `post=` `years=` `hold=` |
+| GET | `/api/events/premium` | `?symbol=` `type=FOMC\|CPI\|EARNINGS` `years=` — today's straddle vs past realized event moves, plus IV rank from recorded snapshots |
+| GET | `/api/research/momentum` | `?universe=holdings\|basket` `portfolioId=` `commissionBps=` `slippageBps=` `short=0\|1` |
 | POST | `/api/sync` | Full price + snapshot rebuild |
 
 ## Scripts
 
-**Backend:** `npm run dev` · `npm run test` · `npm run typecheck` · `npm run prisma:migrate` · `npm run prisma:studio` · `npm run events:cpi`
+**Backend:** `npm run dev` · `npm run test` · `npm run typecheck` · `npm run prisma:migrate` · `npm run prisma:studio` · `npm run events:cpi` · `npm run factors:refresh`
 
 **Frontend:** `npm run dev` · `npm run build` · `npm run lint`
 
