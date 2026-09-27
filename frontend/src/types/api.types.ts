@@ -371,3 +371,40 @@ export type EventStudy = {
     };
     notes: string[];
 };
+
+export type VariancePremiumMove = {
+    date: string;
+    move: number;
+};
+
+export type VariancePremium = {
+    symbol: string;
+    eventType: EventType;
+    years: number;
+    nextEvent: string | null;
+    expiry: string | null;
+    expiryBefore: string | null;
+    spot: number | null;
+    atmIv: number | null;
+    impliedMove: number | null;
+    method: "term-structure" | "straddle" | null;
+    moves: VariancePremiumMove[];
+    stats: {
+        n: number;
+        medianAbs: number | null;
+        meanAbs: number | null;
+        gap: number | null;
+        percentile: number | null;
+    };
+    ivHistory: {
+        n: number;
+        since: string;
+        current: number;
+        low: number;
+        high: number;
+        rank: number;
+        percentile: number;
+        expiry: string;
+    } | null;
+    notes: string[];
+};

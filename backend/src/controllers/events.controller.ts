@@ -2,6 +2,7 @@ import {Request, Response} from "express";
 import {z} from "zod";
 import {AppError} from "../utils/AppError";
 import {runEventStudy} from "../services/eventStudy.service";
+import {getVariancePremium} from "../services/variancePremium.service";
 
 const MAX_SYMBOLS = 8;
 
@@ -37,5 +38,30 @@ export async function getEventStudyHandler(req: Request, res: Response) {
     }
 
     const result = await runEventStudy({...parsed.data, symbols});
+    res.json(result);
+}
+
+const premiumQuerySchema = z.object({
+    symbol: z.string().trim().min(1).max(12),
+    type: z.enum(["FOMC", "CPI", "EARNINGS"]),
+    years: z.coerce.number().int().min(2).max(6).default(5),
+});
+
+export async function getVariancePremiumHandler(req: Request, res: Response) {
+    const parsed = premiumQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+        throw new AppError(
+            400,
+            "VALIDATION_ERROR",
+            "symbol and type (FOMC, CPI, EARNINGS) are required; years must be between 2 and 6"
+        );
+    }
+
+    const symbol = parsed.data.symbol.toUpperCase();
+    if (!/^[A-Z0-9][A-Z0-9.-]{0,11}$/.test(symbol)) {
+        throw new AppError(400, "VALIDATION_ERROR", "That ticker is not valid.");
+    }
+
+    const result = await getVariancePremium(symbol, parsed.data.type, parsed.data.years);
     res.json(result);
 }

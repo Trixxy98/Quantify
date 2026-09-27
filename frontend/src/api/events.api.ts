@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { EventStudy, EventType } from "../types/api.types";
+import type { EventStudy, EventType, VariancePremium } from "../types/api.types";
 
 export type EventStudyQuery = {
   symbols: string[];
@@ -20,6 +20,18 @@ export async function getEventStudy(query: EventStudyQuery): Promise<EventStudy>
       years: query.years,
       hold: query.hold,
     },
+    timeout: 60_000,
+  });
+  return data;
+}
+
+export async function getVariancePremium(
+  symbol: string,
+  type: EventType,
+  years: number
+): Promise<VariancePremium> {
+  const {data} = await apiClient.get<VariancePremium>("/events/premium", {
+    params: {symbol, type, years},
     timeout: 60_000,
   });
   return data;

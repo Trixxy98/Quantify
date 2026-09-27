@@ -27,9 +27,9 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 - **Holdings** — table + price chart with **avg cost** and **max drawdown** (peak → trough in the selected range); closed lots with realized P&L
 - **Transactions** — symbol search, close-price fill on trade date
 - **Vol** — US options chain, Black–Scholes implied vol (Newton + bisection), 3D surface + skew/term slices
-- **Events** — event study around Fed days, CPI releases and earnings: market-model abnormal returns, CAR with a ±2 s.e. band, event-day vs other-day return distributions, and an event-only trading rule
+- **Events** — event study around Fed days, CPI releases and earnings: market-model abnormal returns, CAR with a ±2 s.e. band, event-day vs other-day return distributions, an event-only trading rule, and today's ATM straddle versus the median realized move on past events (not a historical IV backtest)
 - Manual **Sync** still exists for a full market pass
-- Daily cron: 6:30am MYT, Tue–Sat (after the US close)
+- Daily cron: 6:30am MYT, Tue–Sat (after the US close). It also records the front-month ATM implied vol of every US name (plus SPY) into `ImpliedSnapshot`, because Yahoo serves only today's chain — IV rank on the Events page is built from these rows and stays blank until 20 sessions exist
 
 ## How numbers work
 
@@ -111,6 +111,7 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 | POST/PATCH/DELETE | `/api/portfolios/:id/transactions` | Edit/delete recomputes holdings |
 | GET | `/api/market/search` `close` `iv-surface` | Yahoo search; close; US options IV surface |
 | GET | `/api/events/study` | `?symbols=` `type=FOMC\|CPI\|EARNINGS` `pre=` `post=` `years=` `hold=` |
+| GET | `/api/events/premium` | `?symbol=` `type=FOMC\|CPI\|EARNINGS` `years=` — today's straddle vs past realized event moves, plus IV rank from recorded snapshots |
 | POST | `/api/sync` | Full price + snapshot rebuild |
 
 ## Scripts

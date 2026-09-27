@@ -2,12 +2,14 @@ import { useMemo, useState } from "react";
 import axios from "axios";
 import { useOutletContext } from "react-router-dom";
 import { EventCarChart } from "../components/events/EventCarChart";
+import { EventPremiumChart } from "../components/events/EventPremiumChart";
 import { EventControls, type StudySettings } from "../components/events/EventControls";
 import { EventDistributionChart } from "../components/events/EventDistributionChart";
 import { EventEquityChart } from "../components/events/EventEquityChart";
 import { EventTable } from "../components/events/EventTable";
 import { MetricCard } from "../components/dashboard/MetricCard";
 import { useEventStudy } from "../hooks/useEventStudy";
+import { useVariancePremium } from "../hooks/useVariancePremium";
 import { useHoldings } from "../hooks/useHoldings";
 import type { AppShellContext } from "../components/layout/AppShell";
 import { formatNumber, formatPct, formatPctAbs } from "../utils/format";
@@ -54,6 +56,8 @@ export default function EventsPage() {
       ? "Could not run the study"
       : null;
 
+  const premiumQuery = useVariancePremium(settings.symbol, settings.type, settings.years);
+  const premium = premiumQuery.data;
   const endOffset = data?.offsets[data.offsets.length - 1];
 
   function patch(next: Partial<StudySettings>) {
@@ -103,6 +107,76 @@ export default function EventsPage() {
           isLoading={isFetching}
         />
       </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <MetricCard
+          label="Implied move"
+          value={premium?.impliedMove != null ? `±${formatPctAbs(premium.impliedMove)}` : "—"}
+          hint={
+            premium?.method === "term-structure"
+              ? `${premium.symbol} · ${premium.expiryBefore} vs ${premium.expiry} term structure`
+              : premium?.method === "straddle"
+                ? `${premium.symbol} straddle to ${premium.expiry}`
+                : premium
+                  ? premium.symbol
+                  : undefined
+          }
+          isLoading={premiumQuery.isFetching && !premium}
+        />
+        <MetricCard
+          label="Mean realized"
+          value={premium?.stats.meanAbs != null ? formatPctAbs(premium.stats.meanAbs) : "—"}
+          hint={
+            premium
+              ? `median ${premium.stats.medianAbs != null ? formatPctAbs(premium.stats.medianAbs) : "—"} · ${premium.stats.n} past ${settings.type.toLowerCase()} sessions`
+              : undefined
+          }
+          isLoading={premiumQuery.isFetching && !premium}
+        />
+        <MetricCard
+          label="Gap"
+          value={premium?.stats.gap != null ? formatPct(premium.stats.gap) : "—"}
+          hint="implied minus mean absolute move"
+          tone={premium?.stats.gap ?? undefined}
+          isLoading={premiumQuery.isFetching && !premium}
+        />
+        <MetricCard
+          label="Vs past moves"
+          value={premium?.stats.percentile != null ? formatPctAbs(premium.stats.percentile, 0) : "—"}
+          hint={
+            premium?.atmIv != null
+              ? `ATM IV ${formatPctAbs(premium.atmIv)} · share of past moves below today's price`
+              : "share of past moves smaller than today's price"
+          }
+          isLoading={premiumQuery.isFetching && !premium}
+        />
+        <MetricCard
+          label="IV rank"
+          value={premium?.ivHistory ? formatPctAbs(premium.ivHistory.rank, 0) : "—"}
+          hint={
+            premium?.ivHistory
+              ? `${formatPctAbs(premium.ivHistory.low, 1)}–${formatPctAbs(premium.ivHistory.high, 1)} over ${premium.ivHistory.n} recorded sessions`
+              : "front-month ATM IV vs the sessions this app has recorded"
+          }
+          isLoading={premiumQuery.isFetching && !premium}
+        />
+      </section>
+
+      {premium && (
+        <>
+          {settings.pooled && (
+            <p className="text-xs text-[var(--color-text-muted)]">
+              The straddle is priced on {premium.symbol}. Pooling applies to the event study only.
+            </p>
+          )}
+          <EventPremiumChart premium={premium} />
+          <ul className="space-y-1 text-xs text-[var(--color-text-muted)]">
+            {premium.notes.map((note) => (
+              <li key={note}>· {note}</li>
+            ))}
+          </ul>
+        </>
+      )}
 
       {isFetching && !data ? (
         <div className="h-72 rounded-xl bg-[var(--color-surface)] animate-pulse" />
