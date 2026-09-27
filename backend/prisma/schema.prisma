@@ -173,6 +173,17 @@ model ImpliedSnapshot {
   @@index([symbol, date])
 }
 
+// Ken French daily factors, stored as fractions (the files publish percent).
+// US only. Refreshed from the data library; the tail lags by about a month.
+model FactorReturn {
+  date   DateTime @db.Date
+  factor String // Mkt-RF, SMB, HML, RMW, CMA, Mom, RF
+  value  Decimal  @db.Decimal(16, 10)
+
+  @@id([date, factor])
+  @@index([factor, date])
+}
+
 // Benchmark index for Beta & Alpha (e.g. ^KLSE for Bursa, ^GSPC for US)
 model BenchmarkPrice {
   id     String   @id @default(cuid())

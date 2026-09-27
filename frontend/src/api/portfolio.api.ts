@@ -15,6 +15,7 @@ import type {
   Range,
   TransactionListResponse,
   PortfolioRisk,
+  FactorExposure,
 } from "../types/api.types";
 
 export async function createTransaction(portfolioId: string, input: CreateTransactionInput) {
@@ -128,6 +129,13 @@ export async function updateTransaction(
 
 export async function deleteTransaction(portfolioId: string, transactionId: string): Promise<void> {
   await apiClient.delete(`/portfolios/${portfolioId}/transactions/${transactionId}`);
+}
+
+export async function getFactorExposure(portfolioId: string, range: Range): Promise<FactorExposure> {
+  const {data} = await apiClient.get<FactorExposure>(`/portfolios/${portfolioId}/factors`, {
+    params: {range},
+  });
+  return data;
 }
 
 export async function getPortfolioRisk(

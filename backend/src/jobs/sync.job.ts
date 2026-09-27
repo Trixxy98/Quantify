@@ -2,6 +2,7 @@ import cron from "node-cron";
 import {getTrackedSymbols, syncMarketData} from "../services/market.service";
 import {rebuildAllSnapshots} from "../services/snapshot.service";
 import {captureImpliedSnapshots} from "../services/impliedSnapshot.service";
+import {refreshFactorsIfStale} from "../services/factors.service";
 import {AppError} from "../utils/AppError";
 
 let isSyncRunning = false;
@@ -22,7 +23,8 @@ export async function runFullSync(daysBack = 400) {
         // only chance to record it. Upserts by session, so a manual sync
         // during US hours is overwritten by the closing marks next morning.
         const implied = await captureImpliedSnapshots(await getTrackedSymbols());
-        return {...market, portfolios, impliedSnapshots: implied.recorded};
+        const factors = await refreshFactorsIfStale();
+        return {...market, portfolios, impliedSnapshots: implied.recorded, factorsThrough: factors.through};
     } finally {
         isSyncRunning = false;
     }

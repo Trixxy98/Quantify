@@ -408,3 +408,23 @@ export type VariancePremium = {
     } | null;
     notes: string[];
 };
+
+export type FactorLoading = {
+    factor: string;
+    beta: number;
+    se: number;
+    tStat: number;
+};
+
+export type FactorExposure = {
+    symbols: string[];
+    n: number;
+    dataThrough: string | null;
+    alpha: number | null;
+    alphaSe: number | null;
+    alphaT: number | null;
+    rSquared: number | null;
+    loadings: FactorLoading[] | null;
+    rolling: {date: string; alpha: number; loadings: {factor: string; beta: number}[]}[];
+    notes: string[];
+};

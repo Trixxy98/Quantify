@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { to: "/dashboard", label: "Overview" },
   { to: "/analysis", label: "Analysis" },
   { to: "/risk", label: "Risk" },
+  { to: "/factors", label: "Factors" },
   { to: "/chart", label: "Chart" },
   { to: "/holdings", label: "Holdings" },
   { to: "/transactions", label: "Transactions" },

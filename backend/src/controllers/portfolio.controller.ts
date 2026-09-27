@@ -3,6 +3,7 @@ import * as portfolioService from "../services/portfolio.service";
 import * as dashboardService from "../services/dashboard.service";
 import * as analysisService from "../services/analysis.service";
 import * as riskService from "../services/risk.service";
+import * as factorsService from "../services/factors.service";
 import { listTransactionsQuerySchema, rangeQuerySchema } from "../validators/portfolio.validator";
 
 export async function listPortfoliosHandler(req: Request, res: Response) {
@@ -109,5 +110,11 @@ export async function getPriceSeriesHandler(req: Request, res: Response) {
 export async function getRiskHandler(req: Request, res: Response) {
     const {range, window} = rangeQuerySchema.parse(req.query);
     const result = await riskService.getRisk(req.params.id, req.userId!, range, window);
+    res.json(result);
+}
+
+export async function getFactorsHandler(req: Request, res: Response) {
+    const {range} = rangeQuerySchema.parse(req.query);
+    const result = await factorsService.getFactorExposure(req.params.id, req.userId!, range);
     res.json(result);
 }
