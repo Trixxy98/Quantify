@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { to: "/analysis", label: "Analysis" },
   { to: "/risk", label: "Risk" },
   { to: "/factors", label: "Factors" },
+  { to: "/research", label: "Research" },
   { to: "/chart", label: "Chart" },
   { to: "/holdings", label: "Holdings" },
   { to: "/transactions", label: "Transactions" },

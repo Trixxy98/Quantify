@@ -40,12 +40,12 @@ Every module below follows the same rules. If a proposed feature cannot satisfy 
 | Research | Event study (FOMC / CPI / earnings), event-only rule | done | |
 | Research | Variance premium: term-structure implied move vs realized event moves | done | IV rank blank until 20 recorded sessions |
 | Research | Fama–French 5 + momentum on the US sleeve, walk-forward harness, cost model | done | Factors page. French data through the last monthly file. Loadings need 120 sessions |
+| Research | 12-1 momentum, walk-forward, after costs | done | Research page. Fixed 30-name basket dated 2026-01-01, or the portfolio's US holdings |
 | Tooling | Chart workspace, saved views | done | |
-| Tests | 85 Vitest cases across metrics, corporate actions, lots, risk math, premium, IV snapshot | done | |
+| Tests | Vitest across metrics, corporate actions, lots, risk math, premium, IV snapshot, OLS, walk-forward, momentum | done | |
 
-What the README currently says under *What it is not*: "No price prediction or chart-pattern signals." Phase B
-changes that to: *no chart patterns, no discretionary calls; signals are academic factors tested walk-forward with
-costs.* Update the README when B ships, not before.
+The README *What it is not* section now says there is no chart-pattern signal, and that the one tested rule is 12-1
+momentum, walk-forward, after costs.
 
 ---
 
@@ -78,7 +78,7 @@ model forward through time, and a cost model. Build them once.
 **API**
 
 - `GET /api/portfolios/:id/factors?range=` → `{ loadings: [{factor, beta, tStat}], alpha, alphaSe, n, rolling: [...] , dataThrough }`
-- Walk-forward is a library (`backtest/walkForward.ts`), not an endpoint, until Phase B gives it a signal.
+- Walk-forward is a library (`research/walkForward.ts`). Phase B is the endpoint that uses it.
 
 **UI**
 
@@ -97,7 +97,7 @@ and the walk-forward harness has tests proving the test window never sees train 
 
 ---
 
-### Phase B — One signal, tested honestly: 12-1 momentum on the US sleeve `next`
+### Phase B — One signal, tested honestly: 12-1 momentum on the US sleeve `done`
 
 **Why this signal.** Cross-sectional momentum is the most replicated anomaly in the literature (Jegadeesh–Titman
 1993 onward), it is simple, and it is exactly what a reader with a finance background will expect to see tested.
@@ -170,7 +170,7 @@ intensity in [0, 1]; weights sum to 1 and are non-negative.
 
 ---
 
-### Phase D — Bootstrap intervals `planned`
+### Phase D — Bootstrap intervals `next`
 
 **Why.** Sharpe's asymptotic SE and CAR's ±2 s.e. assume independence. Drawdown has no interval at all. Block
 bootstrap gives honest intervals for all three with one method.
@@ -262,8 +262,8 @@ A → B → D is the research spine. C, E, F can be picked up in any gap.
 
 ## 7. Open questions
 
-1. **Phase B universe.** Holdings only (honest but a thin cross-section) or holdings plus a fixed basket (wider,
-   but the basket choice is itself a decision)? Default in this plan: both, selectable, basket dated in JSON.
+1. **Phase B universe.** Resolved: both, selectable. The basket is `momentumBasket.json`, dated 2026-01-01. Holdings
+   with fewer than three US names are reported as not a cross-sectional test.
 2. **Phase A refresh.** Resolved: the cron refreshes when the stored tail is older than 7 days, and
    `npm run factors:refresh` forces a download. The page states the data-through date.
 3. **Where Research lives in the nav.** New top-level page, or a tab inside Events? Default: new page, since the

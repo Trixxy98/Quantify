@@ -428,3 +428,39 @@ export type FactorExposure = {
     rolling: {date: string; alpha: number; loadings: {factor: string; beta: number}[]}[];
     notes: string[];
 };
+
+export type MomentumStats = {
+    annualizedReturn: number;
+    volatility: number;
+    sharpe: number;
+    sharpeSe: number;
+    maxDrawdown: number;
+    hitRate: number | null;
+    avgTurnover: number | null;
+};
+
+export type MomentumStudy = {
+    universe: "holdings" | "basket";
+    basketAsOf: string | null;
+    symbols: string[];
+    allowShort: boolean;
+    commissionBps: number;
+    slippageBps: number;
+    longCount: number;
+    shortCount: number;
+    latestLong: string[];
+    conclusion: string;
+    from: string | null;
+    to: string | null;
+    n: number;
+    strategy: MomentumStats | null;
+    buyHold: MomentumStats | null;
+    equalWeight: MomentumStats | null;
+    benchmark: MomentumStats | null;
+    benchmarkSymbol: string | null;
+    alpha: {annualized: number; se: number; tStat: number; n: number} | null;
+    equity: {date: string; strategy: number; buyHold: number; equalWeight: number; benchmark: number | null}[];
+    excess: {date: string; value: number}[];
+    turnover: {month: string; turnover: number}[];
+    notes: string[];
+};

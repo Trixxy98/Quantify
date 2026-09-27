@@ -24,6 +24,7 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 - **Analysis** — contribution by name (stock vs FX), variance share, trailing beta; sliders for KLCI / S&P / USD-MYR (linear estimate, not a forecast)
 - **Risk** — correlation, Garman–Klass vs close-to-close vol, marginal and component risk, historical VaR / expected shortfall with a Kupiec breach test, underwater chart and worst drawdowns
 - **Factors** — Fama–French five-factor plus momentum regression of the US sleeve (USD), Newey–West t-stats, rolling 252-day loadings. Bursa holdings are excluded
+- **Research** — 12-1 cross-sectional momentum on a fixed US large-cap basket or the portfolio's US holdings. Monthly, top third, walk-forward, after commission and slippage, against buy-and-hold, equal weight, and the S&P 500 total return
 - **Chart** — compose portfolio, KLCI, S&P 500 TR, a holding, drawdown, and rolling vol/beta on two axes; save the layout in the browser
 - **Holdings** — table + price chart with **avg cost** and **max drawdown** (peak → trough in the selected range); closed lots with realized P&L
 - **Transactions** — symbol search, close-price fill on trade date
@@ -63,7 +64,7 @@ Yahoo restates its whole price history when a stock splits. Because a sync only 
 - No FIFO tax lots: realized P&L is weighted average, which is what the holdings table already uses
 - KLCI has no total-return version on Yahoo, so the Bursa leg of the benchmark is still a price index and is understated by roughly its dividend yield
 - Dividends are counted from the ex-date at the gross amount — no withholding tax, no payment-date lag
-- No price prediction or chart-pattern signals
+- No chart-pattern or discretionary signals. The one tested rule is 12-1 momentum, walk-forward and after costs, and the Research page states when it loses to buy-and-hold
 - IV surface is European Black–Scholes on US listed chains (American options ≈ teaching approx)
 - Event dates are best-effort: FOMC is the official Fed calendar, but earnings dates are derived from Yahoo's 10-Q/10-K list (Yahoo does not publish historical announcement dates) and CPI needs a FRED key
 - Scenario shocks are `weight × beta × index + FX sensitivity`, not a model
@@ -113,6 +114,7 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 | GET | `/api/market/search` `close` `iv-surface` | Yahoo search; close; US options IV surface |
 | GET | `/api/events/study` | `?symbols=` `type=FOMC\|CPI\|EARNINGS` `pre=` `post=` `years=` `hold=` |
 | GET | `/api/events/premium` | `?symbol=` `type=FOMC\|CPI\|EARNINGS` `years=` — today's straddle vs past realized event moves, plus IV rank from recorded snapshots |
+| GET | `/api/research/momentum` | `?universe=holdings\|basket` `portfolioId=` `commissionBps=` `slippageBps=` `short=0\|1` |
 | POST | `/api/sync` | Full price + snapshot rebuild |
 
 ## Scripts

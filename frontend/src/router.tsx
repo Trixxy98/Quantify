@@ -12,6 +12,7 @@ import TransactionsPage from "./pages/TransactionsPage";
 import ChartPage from "./pages/ChartPage";
 import RiskPage from "./pages/RiskPage";
 import FactorsPage from "./pages/FactorsPage";
+import ResearchPage from "./pages/ResearchPage";
 
 export function AppRoutes() {
   return (
@@ -24,6 +25,7 @@ export function AppRoutes() {
           <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/risk" element={<RiskPage />} />
           <Route path="/factors" element={<FactorsPage />} />
+          <Route path="/research" element={<ResearchPage />} />
           <Route path="/chart" element={<ChartPage />} />
           <Route path="/holdings" element={<HoldingsPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
