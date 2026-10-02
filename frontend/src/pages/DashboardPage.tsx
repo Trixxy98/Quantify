@@ -9,7 +9,7 @@ import { usePortfolioMetrics } from "../hooks/usePortfolioMetrics";
 import { usePortfolioPerformance } from "../hooks/usePortfolioPerformance";
 import { usePortfolioSummary } from "../hooks/usePortfolioSummary";
 import type { AppShellContext } from "../components/layout/AppShell";
-import { formatMoney, formatNumber, formatPct, formatPctAbs } from "../utils/format";
+import { formatInterval, formatMoney, formatNumber, formatPct, formatPctAbs } from "../utils/format";
 import type { Range } from "../types/api.types";
 
 export default function DashboardPage() {
@@ -104,13 +104,20 @@ export default function DashboardPage() {
         <MetricCard
           label="CAGR"
           value={metrics ? formatPct(metrics.cagr) : "—"}
+          hint={formatInterval(metrics?.intervals.cagr, (value) => formatPct(value, 1)) ?? undefined}
           tone={metrics?.cagr}
           isLoading={isMetricsLoading}
         />
         <MetricCard
           label="Sharpe Ratio"
           value={metrics ? formatNumber(metrics.sharpeRatio) : "—"}
-          hint={metrics ? `± ${formatNumber(metrics.sharpeStandardError)}` : undefined}
+          hint={
+            metrics
+              ? [`± ${formatNumber(metrics.sharpeStandardError)}`, formatInterval(metrics.intervals.sharpe, formatNumber)]
+                  .filter(Boolean)
+                  .join(" · ")
+              : undefined
+          }
           isLoading={isMetricsLoading}
         />
         <MetricCard
@@ -122,6 +129,7 @@ export default function DashboardPage() {
         <MetricCard
           label="Max Drawdown"
           value={metrics ? formatPct(metrics.maxDrawdown) : "—"}
+          hint={formatInterval(metrics?.intervals.maxDrawdown, (value) => formatPct(value, 1)) ?? undefined}
           tone={metrics?.maxDrawdown}
           isLoading={isMetricsLoading}
         />
@@ -148,7 +156,9 @@ export default function DashboardPage() {
 
       <p className="text-xs text-[var(--color-text-muted)]">
         Risk figures are measured on the time-weighted, dividend-inclusive return series, so
-        deposits and withdrawals do not count as performance.
+        deposits and withdrawals do not count as performance. The 90% ranges come from 2,000 block-bootstrap
+        resamples of those daily returns (blocks of about 20 sessions, so calm and stormy stretches stay together);
+        a range that includes zero means the sign is not settled at this sample size.
       </p>
 
       <PerformanceChart data={performance} isLoading={isPerformanceLoading} />

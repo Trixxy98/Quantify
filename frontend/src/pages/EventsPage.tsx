@@ -12,7 +12,7 @@ import { useEventStudy } from "../hooks/useEventStudy";
 import { useVariancePremium } from "../hooks/useVariancePremium";
 import { useHoldings } from "../hooks/useHoldings";
 import type { AppShellContext } from "../components/layout/AppShell";
-import { formatNumber, formatPct, formatPctAbs } from "../utils/format";
+import { formatInterval, formatNumber, formatPct, formatPctAbs } from "../utils/format";
 
 const MAX_POOLED = 8;
 
@@ -89,7 +89,15 @@ export default function EventsPage() {
         <MetricCard
           label={`CAR to day +${settings.post}`}
           value={endOffset ? formatPct(endOffset.acar) : "—"}
-          hint={endOffset ? `t = ${formatNumber(endOffset.tStat)}` : undefined}
+          hint={
+            endOffset && data
+              ? [
+                  `t = ${formatNumber(endOffset.tStat)}`,
+                  formatInterval(data.finalCar.interval, (value) => formatPct(value, 1)) ??
+                    `${data.finalCar.dates} event dates, too few for a range`,
+                ].join(" · ")
+              : undefined
+          }
           tone={endOffset?.acar}
           isLoading={isFetching}
         />

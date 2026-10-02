@@ -4,8 +4,10 @@ import {
     annualizedReturn,
     beta,
     cagr,
+    cagrFromReturns,
     indexTo100,
     maxDrawdown,
+    maxDrawdownFromReturns,
     sharpeRatio,
     sharpeStandardError,
     timeWeightedIndex,
@@ -209,5 +211,18 @@ describe("timeWeightedIndex", () => {
     it("starts at 100 and returns empty for no data", () => {
         expect(timeWeightedIndex([], noFlows)).toEqual([]);
         expect(timeWeightedIndex(series([100]), noFlows)[0].value).toBe(100);
+    });
+});
+
+describe("return-based helpers used by the bootstrap", () => {
+    const values = series([100, 110, 99, 120, 108]);
+    const returns = toDailyReturns(values);
+
+    it("cagrFromReturns matches cagr on the compounded index", () => {
+        expect(cagrFromReturns(returns, 0.5)).toBeCloseTo(cagr(100, 108, 0.5), 12);
+    });
+
+    it("maxDrawdownFromReturns matches maxDrawdown on the compounded index", () => {
+        expect(maxDrawdownFromReturns(returns)).toBeCloseTo(maxDrawdown(values), 12);
     });
 });

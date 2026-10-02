@@ -35,6 +35,27 @@ export function cagr(startValue: number, endValue: number, years: number): numbe
     return Math.pow(endValue / startValue, 1 / years) -1;
 }
 
+/** Same as `cagr` on the index these returns compound into, over the same calendar years. */
+export function cagrFromReturns(dailyReturns: number[], years: number): number {
+    let growth = 1;
+    for (const r of dailyReturns) growth *= 1 + r;
+    return cagr(1, growth, years);
+}
+
+/** Same as `maxDrawdown` on the index these returns compound into. */
+export function maxDrawdownFromReturns(dailyReturns: number[]): number {
+    let level = 1;
+    let peak = 1;
+    let maxDD = 0;
+    for (const r of dailyReturns) {
+        level *= 1 + r;
+        if (level > peak) peak = level;
+        const drawdown = (level - peak) / peak;
+        if (drawdown < maxDD) maxDD = drawdown;
+    }
+    return maxDD;
+}
+
 export function volatility(dailyReturns: number[], tradingDaysPerYear = 252): number {
     return stdDev(dailyReturns) * Math.sqrt(tradingDaysPerYear);
   }
