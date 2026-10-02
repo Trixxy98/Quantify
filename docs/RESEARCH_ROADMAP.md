@@ -237,6 +237,82 @@ as descriptive; no significance claims below 30 trades.
 
 ---
 
+### Phase G — Specialist forecasting agents and a manager `planned`
+
+**Why.** The natural next question after "does one signal work" is "do several specialists, combined, forecast
+anything?". Each agent here is a statistical model with one job and a public track record, not a language model with
+opinions. The deliverable is the scoreboard: which agents have out-of-sample skill after costs, which do not, and
+whether combining them beats the best single one. An honest "most of them have no edge" is a valid result
+(principle 5).
+
+**Common contract**
+
+- Horizon: one month, rebalanced at month end, same calendar as Phase B. Universe: the dated 30-name basket, plus
+  the portfolio's US holdings when there are at least three.
+- Every agent emits one forecast per (symbol, month end) using only data available at that close. Features are
+  lagged one session; a shift test proves it (as in Phase B).
+- Every agent is fitted inside the Phase A walk-forward harness: expanding train window, minimum 60 months, refit
+  yearly, scored only on the following unseen months.
+- Hyperparameters are fixed before the first run and written in this file. Ridge penalty is chosen by an inner
+  walk-forward on the train folds only. No sweeps on test data.
+
+**The five agents**
+
+| Agent | Forecasts | Model | Inputs | Must beat |
+| --- | --- | --- | --- | --- |
+| Trend | Next-month return rank | Ridge, cross-sectional | 1, 3, 6 and 12-1 month returns; distance from 200-day mean | Plain 12-1 rank (Phase B) |
+| Factor | Next-month return rank | Rolling FF5 + Mom loadings × trailing 12-month factor premia | Stored Ken French factors | Zero forecast |
+| Volatility | Next 21-session realized vol | HAR (Corsi 2009) by OLS | Daily, weekly, monthly Garman–Klass vol; recorded ATM IV once 252 sessions exist | Trailing 21-session vol |
+| Event | Next-month return rank and vol uplift | Per-name mean abnormal return and move size on past events of the types scheduled inside the month | Event study (FOMC, CPI, earnings) | Zero forecast |
+| Risk | Probability the market falls ≥ 5% peak to trough within the month | Logistic regression (IRLS) | Index vol level, vol of vol, mean pairwise correlation, index trend | Base rate |
+
+The Volatility agent needs only OHLC, so it also covers Bursa holdings. The return-rank agents stay US-only for the
+same reason as Phase A.
+
+**Scoring** (out-of-sample only, each with `n` and a Phase D bootstrap interval)
+
+- Return-rank agents: mean monthly Spearman IC with Newey–West SE, hit rate, top-minus-bottom third spread after
+  costs. Power check stated on the page: with about 70 test months, mean IC needs to be roughly 0.035 or more to
+  clear t = 2.
+- Volatility: QLIKE and MSE against the trailing-vol baseline, with a Diebold–Mariano test.
+- Risk: Brier skill score against the base rate, and a reliability table (forecast bucket vs observed frequency).
+
+**Manager**
+
+- Combines the return-rank agents with weights proportional to each one's trailing out-of-sample IC, floored at
+  zero and shrunk halfway toward equal weight. An agent with negative trailing IC gets no weight.
+- Sizes positions by inverse Volatility-agent forecast; cuts gross exposure by half when the Risk agent's
+  probability is above its own 80th percentile.
+- Long the top third, through the Phase A cost model, against buy-and-hold, equal weight, the best single agent and
+  `^SP500TR`. Reports Fama–French alpha like Phase B.
+
+**Live record.** The backtest and the live record are shown separately. A month-end step in the cron writes each
+agent's forecasts to an `AgentForecast` table (agent, symbol, month, forecast, model version); rows are never
+updated. Live skill is scored only on those rows and starts the day this ships (principle 7).
+
+**API** `GET /api/research/agents` (scoreboard and manager), `GET /api/research/agents/:agent` (detail and current
+forecasts).
+
+**UI** **Agents** page: a scoreboard table with one row per agent (metric, `n`, value [5th, 95th], vs baseline,
+verdict in words); the manager's equity curve against the comparators; a table of the current month's forecasts for
+the holdings; the correlation between agents' forecasts, so it is visible when two "specialists" say the same thing.
+
+**Delivery**
+
+- G1: harness wiring, `AgentForecast` table, Trend and Volatility agents, scoreboard.
+- G2: Factor, Event and Risk agents.
+- G3: manager, live recording in the cron, Agents page complete.
+
+**Tests** Shift test per agent (prices moved one session later change the forecast; future prices never do); HAR
+recovers known coefficients on simulated data; logistic regression on a separable and a noisy synthetic set; IC
+equals 1 on a perfect ranking and about 0 on noise; manager weights sum to 1 and give zero to negative-IC agents;
+`AgentForecast` rows are append-only.
+
+**Out of scope** Language-model forecasts, deep learning, gradient boosting (no dependency-free implementation
+worth trusting yet), news or sentiment, intraday features, parameter sweeps.
+
+---
+
 ## 4. Deferred and rejected
 
 | Item | Status | Reason |
@@ -249,6 +325,10 @@ as descriptive; no significance claims below 30 trades.
 | CI pipeline | done | `.github/workflows/ci.yml`: backend typecheck and tests, frontend typecheck and lint, on `main` / `dev` pushes and PRs |
 | CSV broker import, production auth | deferred | Engineering, not research; revisit when the research layer is done |
 | Historical IV backfill from a proxy (e.g. realized vol) | rejected | Principle 7 |
+| Language-model agents that forecast prices | rejected | No measurable skill, and their training data contains the "future" of any backtest window, so the test leaks. Principles 1 and 2 |
+| Language-model analyst over Phase G | deferred | Only to describe the agents' numbers, never to produce one. Needs an API key and per-call cost |
+| Sentiment agent | deferred | No news or social data source in the app |
+| Gradient-boosted agents | deferred | After G, if a linear agent shows skill worth trying to improve |
 
 ---
 
@@ -258,13 +338,14 @@ as descriptive; no significance claims below 30 trades.
 A  factors + walk-forward + costs
 └─ B  momentum (needs A for alpha control, harness, costs)
    └─ D  bootstrap (adds intervals to B's results; also to Overview and Events)
+      └─ G  forecasting agents + manager (needs A's harness and costs, B's calendar and signal, D's intervals)
 C  ERC  (independent; needs only existing covariance)
 E  data quality (independent; uses SyncRun and the missed-session check)
 F  trade quality (independent; needs only transactions and prices)
 CI (independent)
 ```
 
-A → B → D is the research spine. E comes next because the data under the spine has to be visibly sound first; CI can
+A → B → D → G is the research spine. E comes next because the data under the spine has to be visibly sound first; CI can
 land alongside it. C and F can be picked up in any gap.
 
 ---
