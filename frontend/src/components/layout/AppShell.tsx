@@ -25,6 +25,7 @@ const NAV_ITEMS = [
   { to: "/transactions", label: "Transactions" },
   { to: "/vol", label: "Vol" },
   { to: "/events", label: "Events" },
+  { to: "/data", label: "Data" },
 ];
 
 // Tabs read as navigation; the filled pill is what marks the current page.
@@ -51,26 +52,21 @@ export function AppShell() {
   const [isRenaming, setIsRenaming] = useState(false);
   const [isManageOpen, setIsManageOpen] = useState(false);
 
-  useEffect(() => {
-    if (isPortfoliosLoading) return;
-    if (!portfolios || portfolios.length === 0) {
-      setSelectedId(undefined);
-      return;
-    }
-    const stillExists = selectedId && portfolios.some((p) => p.id === selectedId);
-    if (stillExists) return;
+  const portfolioId = resolvePortfolioId();
 
+  function resolvePortfolioId() {
+    if (isPortfoliosLoading) return selectedId;
+    if (!portfolios || portfolios.length === 0) return undefined;
+    if (selectedId && portfolios.some((p) => p.id === selectedId)) return selectedId;
     const saved = readSelectedPortfolioId(user?.id);
-    const savedExists = saved && portfolios.some((p) => p.id === saved);
-    setSelectedId(savedExists ? saved : portfolios[0].id);
-  }, [portfolios, selectedId, user?.id, isPortfoliosLoading]);
+    return saved && portfolios.some((p) => p.id === saved) ? saved : portfolios[0].id;
+  }
 
   useEffect(() => {
     if (isPortfoliosLoading) return;
-    writeSelectedPortfolioId(user?.id, selectedId);
-  }, [selectedId, user?.id, isPortfoliosLoading]);
+    writeSelectedPortfolioId(user?.id, portfolioId);
+  }, [portfolioId, user?.id, isPortfoliosLoading]);
 
-  const portfolioId = selectedId;
   const selectedPortfolio = portfolios?.find((p) => p.id === portfolioId);
 
   const deleteMutation = useMutation({

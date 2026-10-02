@@ -5,13 +5,13 @@ import {rebuildAllSnapshots} from "../services/snapshot.service";
 import {captureImpliedSnapshots} from "../services/impliedSnapshot.service";
 import {refreshFactorsIfStale} from "../services/factors.service";
 import {AppError} from "../utils/AppError";
-import {latestUsSessionClose} from "./usSession";
+import {latestUsSessionClose} from "./marketSession";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MIN_DAYS_BACK = 7;
 const MAX_DAYS_BACK = 400;
 /** A run unfinished after this long is assumed dead (process killed mid-sync). */
-const IN_FLIGHT_MS = 60 * 60 * 1000;
+export const IN_FLIGHT_MS = 60 * 60 * 1000;
 
 export type SyncTrigger = "cron" | "manual" | "startup" | "script";
 

@@ -464,3 +464,47 @@ export type MomentumStudy = {
     turnover: {month: string; turnover: number}[];
     notes: string[];
 };
+export type HealthStatus = "ok" | "warn" | "bad";
+
+export type SyncRunView = {
+    trigger: string;
+    startedAt: string;
+    finishedAt: string | null;
+    ok: boolean;
+    error: string | null;
+};
+
+export type DataHealthRow = {
+    symbol: string;
+    kind: "holding" | "benchmark" | "fx" | "options";
+    market: "US" | "BURSA" | null;
+    status: HealthStatus;
+    issues: string[];
+    bars: number;
+    firstDate: string | null;
+    lastDate: string | null;
+    staleSessions: number | null;
+    missingSessions: number;
+    missingRecent: string[];
+    weekendRows: number;
+    splitCliffs: string[];
+    dividendsWithoutBar: string[];
+    splits: number;
+    dividends: number;
+    iv: {recorded: number; lastDate: string | null; missed: number; missedRecent: string[]} | null;
+};
+
+export type DataHealth = {
+    generatedAt: string;
+    expected: {US: string; BURSA: string};
+    sync: {
+        status: HealthStatus;
+        issues: string[];
+        lastOk: SyncRunView | null;
+        inFlightSince: string | null;
+        latestByTrigger: SyncRunView[];
+    };
+    counts: Record<HealthStatus, number>;
+    rows: DataHealthRow[];
+    notes: string[];
+};

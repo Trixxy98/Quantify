@@ -30,6 +30,7 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 - **Transactions** — symbol search, close-price fill on trade date
 - **Vol** — US options chain, Black–Scholes implied vol (Newton + bisection), 3D surface + skew/term slices
 - **Events** — event study around Fed days, CPI releases and earnings: market-model abnormal returns, CAR with a ±2 s.e. band, event-day vs other-day return distributions, an event-only trading rule, and today's ATM straddle versus the median realized move on past events (not a historical IV backtest)
+- **Data** — read-only checks on every stored series behind those pages, worst first: sessions behind and missing against the exchange calendar (from `^GSPC` / `^KLSE`, with index bars on holidays nobody traded dropped), split dates where closes still jump by the split ratio, dividends that go ex on a day with no bar, rows dated on a weekend (a time-zone stamp error), implied-vol gaps, and the latest sync run per trigger with its error
 - Manual **Sync** still exists for a full market pass
 - Daily cron: 6:30am MYT, Tue–Sat (after the US close). It also records the front-month ATM implied vol of every US name (plus SPY) into `ImpliedSnapshot`, because Yahoo serves only today's chain — IV rank on the Events page is built from these rows and stays blank until 20 sessions exist
 - The cron lives in the API process, so it only fires if the API is up at 6:30. On startup the API checks the `SyncRun` table and syncs straight away if nothing has finished since the last US close. Sessions it was down for still have no IV row (the chain is gone), and the Events page lists them. See [Keeping the recorder running](#keeping-the-recorder-running) to sync without the API
@@ -116,6 +117,7 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 | GET | `/api/events/study` | `?symbols=` `type=FOMC\|CPI\|EARNINGS` `pre=` `post=` `years=` `hold=` |
 | GET | `/api/events/premium` | `?symbol=` `type=FOMC\|CPI\|EARNINGS` `years=` — today's straddle vs past realized event moves, plus IV rank from recorded snapshots |
 | GET | `/api/research/momentum` | `?universe=holdings\|basket` `portfolioId=` `commissionBps=` `slippageBps=` `short=0\|1` |
+| GET | `/api/market/health` | Data page: staleness and missing sessions per series vs the exchange calendar, split cliffs, dividends with no bar, weekend-dated rows, IV recording gaps, latest sync run per trigger |
 | POST | `/api/sync` | Full price + snapshot rebuild |
 
 ## Scripts
@@ -123,6 +125,8 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 **Backend:** `npm run dev` · `npm run test` · `npm run typecheck` · `npm run prisma:migrate` · `npm run prisma:studio` · `npm run events:cpi` · `npm run factors:refresh` · `npm run sync:daily` (add `-- --force` to sync even if one already ran)
 
 **Frontend:** `npm run dev` · `npm run build` · `npm run lint`
+
+**CI:** `.github/workflows/ci.yml` runs backend typecheck and tests, and frontend typecheck and lint, on pushes to `main` / `dev` and on pull requests. The tests are pure and need no database.
 
 ### Keeping the recorder running
 

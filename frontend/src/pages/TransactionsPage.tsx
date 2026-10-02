@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { AddTransactionForm } from "../components/dashboard/AddTransactionForm";
 import { TransactionsTable } from "../components/dashboard/TransactionsTable";
@@ -8,10 +8,12 @@ import type { Transaction } from "../types/api.types";
 export default function TransactionsPage() {
   const { portfolioId } = useOutletContext<AppShellContext>();
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [editingFor, setEditingFor] = useState(portfolioId);
 
-  useEffect(() => {
+  if (editingFor !== portfolioId) {
+    setEditingFor(portfolioId);
     setEditing(null);
-  }, [portfolioId]);
+  }
 
   if (!portfolioId) return null;
 

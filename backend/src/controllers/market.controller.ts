@@ -3,6 +3,7 @@ import {z} from "zod";
 import {AppError} from "../utils/AppError";
 import {getCloseOnOrBefore, getQuotes, searchSymbols} from "../services/market.service";
 import {buildIvSurface} from "../services/ivSurface.service";
+import {getDataHealth} from "../services/dataHealth.service";
 
 const searchQuerySchema = z.object({
     q: z.string().trim().min(1).max(80),
@@ -92,4 +93,8 @@ export async function getIvSurfaceHandler(req: Request, res: Response) {
 
     const result = await buildIvSurface(parsed.data.symbol);
     res.json(result);
+}
+
+export async function getDataHealthHandler(req: Request, res: Response) {
+    res.json(await getDataHealth(req.userId!));
 }

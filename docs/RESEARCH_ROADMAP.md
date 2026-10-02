@@ -42,6 +42,7 @@ Every module below follows the same rules. If a proposed feature cannot satisfy 
 | Research | Variance premium: term-structure implied move vs realized event moves | done | IV rank blank until 20 recorded sessions |
 | Research | Fama–French 5 + momentum on the US sleeve, walk-forward harness, cost model | done | Factors page. French data through the last monthly file. Loadings need 120 sessions |
 | Research | 12-1 momentum, walk-forward, after costs | done | Research page. Fixed 30-name basket dated 2026-01-01, or the portfolio's US holdings |
+| Data | Data quality page | done | Data page. Found the USD/MYR one-day date shift (see Phase E) |
 | Tooling | Chart workspace, saved views | done | |
 | Tests | Vitest across metrics, corporate actions, lots, risk math, premium, IV snapshot, OLS, walk-forward, momentum | done | |
 
@@ -171,7 +172,7 @@ intensity in [0, 1]; weights sum to 1 and are non-negative.
 
 ---
 
-### Phase D — Bootstrap intervals `planned`
+### Phase D — Bootstrap intervals `next`
 
 **Why.** Sharpe's asymptotic SE and CAR's ±2 s.e. assume independence. Drawdown has no interval at all. Block
 bootstrap gives honest intervals for all three with one method.
@@ -189,7 +190,7 @@ bootstrap gives honest intervals for all three with one method.
 
 ---
 
-### Phase E — Data quality page `next`
+### Phase E — Data quality page `done`
 
 **Why.** Every check below already exists as a log line or an implicit assumption. Making them visible turns "the
 number looks wrong" into a five-second diagnosis. Moved ahead of D after the recorder silently stopped for a week
@@ -205,6 +206,18 @@ sorted worst first.
 **UI** **Data** page, or a section on Sync. Read-only.
 
 **Tests** Staleness count across a weekend; gap detection on a synthetic series with one removed session.
+
+**Built** `dataHealth.math.ts` (pure, tested) and `dataHealth.service.ts`; **Data** page. Changes from the plan:
+
+- Rebases are not stored, so the check is on the outcome instead: a split date where the stored closes still jump by
+  the split ratio is a history that was never rebased.
+- The `^KLSE` calendar has a bar on 2026-06-01 (Agong's Birthday) that no Bursa stock traded. A date is dropped from
+  the calendar when at least two of the market's series were live and none has a bar, and the page says so.
+- Added a weekend-dated-rows check. It found the first real defect: Yahoo stamps `MYR=X` daily bars at 23:00 UTC,
+  which is London midnight in summer time, so the sync stores each rate one calendar day early from about March to
+  October (Monday's rate under Sunday, Friday's under Thursday). A valuation on day D reads D+1's rate. Fix belongs
+  in `syncUsdMyrRate` (date the bar in Europe/London), followed by a full FX refetch; not done yet.
+- Only IV gaps in the last 20 US sessions colour a row, since the older ones can never be filled.
 
 ---
 
@@ -231,7 +244,7 @@ as descriptive; no significance claims below 30 trades.
 | Chat that only composes Chart workspace views | deferred | Low value relative to effort |
 | Bursa factor model | deferred | No public daily factor set; would have to be constructed and could not be validated |
 | Intraday data, order routing, live feeds | rejected | Principle 6 |
-| CI pipeline | planned | GitHub Actions: backend tests and typecheck, frontend typecheck and lint. Cheap, and 100+ tests that only run locally prove less |
+| CI pipeline | done | `.github/workflows/ci.yml`: backend typecheck and tests, frontend typecheck and lint, on `main` / `dev` pushes and PRs |
 | CSV broker import, production auth | deferred | Engineering, not research; revisit when the research layer is done |
 | Historical IV backfill from a proxy (e.g. realized vol) | rejected | Principle 7 |
 

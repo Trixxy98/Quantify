@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { HoldingsTable } from "../components/dashboard/HoldingsTable";
 import { ClosedLotsTable } from "../components/dashboard/ClosedLotsTable";
@@ -15,29 +15,24 @@ import type { Range } from "../types/api.types";
 export default function HoldingsPage() {
   const { portfolioId } = useOutletContext<AppShellContext>();
   const [range, setRange] = useState<Range>("1Y");
-  const [selectedSymbol, setSelectedSymbol] = useState<string | undefined>();
+  const [pickedSymbol, setPickedSymbol] = useState<string | undefined>();
 
   const { data: summary } = usePortfolioSummary(portfolioId);
   const { data: holdings, isLoading: isHoldingsLoading } = useHoldings(portfolioId);
   const { data: closed, isLoading: isClosedLoading } = useClosedLots(portfolioId);
+
+  const openSymbols = holdings?.map((h) => h.symbol) ?? [];
+  const closedSymbols = closed?.lots.map((lot) => lot.symbol) ?? [];
+  const selectedSymbol =
+    pickedSymbol && (openSymbols.includes(pickedSymbol) || closedSymbols.includes(pickedSymbol))
+      ? pickedSymbol
+      : openSymbols[0] ?? closedSymbols[0];
   const { data: allocation, isLoading: isAllocationLoading } = usePortfolioAllocation(portfolioId);
   const { data: prices, isLoading: isPricesLoading } = useHoldingPrices(
     portfolioId,
     selectedSymbol,
     range
   );
-
-  useEffect(() => {
-    const openSymbols = holdings?.map((h) => h.symbol) ?? [];
-    const closedSymbols = closed?.lots.map((lot) => lot.symbol) ?? [];
-    const known = new Set([...openSymbols, ...closedSymbols]);
-    if (known.size === 0) {
-      setSelectedSymbol(undefined);
-      return;
-    }
-    if (selectedSymbol && known.has(selectedSymbol)) return;
-    setSelectedSymbol(openSymbols[0] ?? closedSymbols[0]);
-  }, [holdings, closed, selectedSymbol]);
 
   const currency = summary?.baseCurrency ?? "MYR";
   const selectedHolding = holdings?.find((h) => h.symbol === selectedSymbol);
@@ -69,14 +64,14 @@ export default function HoldingsPage() {
         currency={currency}
         isLoading={isHoldingsLoading || isAllocationLoading}
         selectedSymbol={selectedSymbol}
-        onSelectSymbol={setSelectedSymbol}
+        onSelectSymbol={setPickedSymbol}
       />
       <ClosedLotsTable
         lots={closed?.lots}
         currency={currency}
         isLoading={isClosedLoading}
         selectedSymbol={selectedSymbol}
-        onSelectSymbol={setSelectedSymbol}
+        onSelectSymbol={setPickedSymbol}
       />
     </>
   );
