@@ -59,7 +59,7 @@ export default function RiskPage() {
                 <thead className="text-left text-[var(--color-text-muted)]">
                     <tr>
                         <th className="pb-2 font-medium">Symbol</th>
-                        <th className="pb-2 font-medium text-right">Symbol</th>
+                        <th className="pb-2 font-medium text-right">Weight</th>
                         <th className="pb-2 font-medium text-right">Close vol</th>
                         <th className="pb-2 font-medium text-right">GK vol</th>
                         <th className="pb-2 font-medium text-right">Beta</th>
@@ -69,7 +69,7 @@ export default function RiskPage() {
                 </thead>
                 <tbody>
                     {(data?.names ?? []).map((row) => (
-                        <tr>
+                        <tr key={row.symbol}>
                             <td className="py-2 font-medium">{row.symbol}</td>
                             <td className="py-2 text-right">{formatPctAbs(row.weight)}</td>
                             <td className="py-2 text-right">{formatPctAbs(row.closeToCloseVol)}</td>
@@ -128,7 +128,7 @@ export default function RiskPage() {
             </div>
             <div className="rounded-xl bg-[var(--color-surface)] p-5">
                 <h2 className="text-sm text-[var(--color-text-muted)] mb-4">Rolling 60-day vol and beta</h2>
-                <div>
+                <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={data?.rolling ?? []}>
                         <CartesianGrid stroke="#334155" strokeDasharray="3 3" />
@@ -158,7 +158,7 @@ export default function RiskPage() {
                 </thead>
                 <tbody>
                     {(data?.drawdowns ?? []).map((row) => (
-                        <tr>
+                        <tr key={row.peak}>
                             <td className="py-2">{row.peak}</td>
                             <td className="py-2">{row.trough}</td>
                             <td className="py-2">{row.recovered ?? "Open"}</td>

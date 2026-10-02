@@ -331,7 +331,9 @@ export async function getVariancePremium(
     const quoted = await liveStraddle(symbol, nextEvent);
     if (quoted.chainNote) notes.push(quoted.chainNote);
 
-    const stored = symbol.includes(".") ? {history: null, recorded: 0, since: null} : await getIvHistory(symbol);
+    const stored = symbol.includes(".")
+        ? {history: null, recorded: 0, since: null, missed: [] as string[]}
+        : await getIvHistory(symbol);
     if (stored.history) {
         notes.push(
             `IV rank uses ${stored.history.n} front-month sessions this app recorded since ${stored.history.since}. It is not Yahoo data.`
@@ -342,6 +344,13 @@ export async function getVariancePremium(
         );
     } else if (!symbol.includes(".")) {
         notes.push(`No IV history recorded for ${symbol} yet. Add it to a portfolio and the daily sync starts building it.`);
+    }
+    if (stored.missed.length > 0) {
+        const shown = stored.missed.slice(0, 5).join(", ");
+        const more = stored.missed.length > 5 ? ` and ${stored.missed.length - 5} more` : "";
+        notes.push(
+            `${stored.missed.length} US sessions since ${stored.since} have no recording (${shown}${more}): no sync ran after that close, or the chain had no usable at-the-money quote. Yahoo serves only the current chain, so they stay empty.`
+        );
     }
 
     const gap = quoted.impliedMove != null && meanAbs != null ? quoted.impliedMove - meanAbs : null;

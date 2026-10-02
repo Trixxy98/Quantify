@@ -16,6 +16,7 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "events:cpi": "tsx scripts/fetchCpiDates.ts",
     "factors:refresh": "tsx scripts/refreshFactors.ts",
+    "sync:daily": "tsx scripts/syncDaily.ts",
     "prisma:studio": "prisma studio"
   },
   "dependencies": {

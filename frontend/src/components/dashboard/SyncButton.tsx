@@ -13,6 +13,7 @@ export function SyncButton() {
             setMessage("Synced successfully");
             await queryClient.invalidateQueries({queryKey: ["portfolio"]});
             await queryClient.invalidateQueries({queryKey: ["portfolios"]});
+            await queryClient.invalidateQueries({queryKey: ["market", "health"]});
         },
         onError: () => {
             setMessage("Failed to sync market data. Please try again.");

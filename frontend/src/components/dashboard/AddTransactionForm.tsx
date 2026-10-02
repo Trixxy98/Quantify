@@ -1,4 +1,4 @@
-import {useEffect, useState, type FormEvent} from "react";
+import {useState, type FormEvent} from "react";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import axios from "axios";
 import {createTransaction, updateTransaction} from "../../api/portfolio.api";
@@ -42,10 +42,7 @@ export function AddTransactionForm({portfolioId, editing = null, onCancelEdit}: 
     const [success, setSuccess] = useState<string | null>(null);
     const {data: close, isFetching: isCloseLoading, isError: isCloseError, isFetched: isCloseFetched} = useMarketClose(symbol, date);
 
-    useEffect(() => {
-        if (priceTouched || close == null) return;
-        setPrice(String(close.close));
-    }, [close, priceTouched]);
+    const effectivePrice = !priceTouched && close ? String(close.close) : price;
 
     const mutation = useMutation({
         mutationFn: () => {
@@ -54,7 +51,7 @@ export function AddTransactionForm({portfolioId, editing = null, onCancelEdit}: 
                 symbol: normalizedSymbol,
                 type,
                 quantity: Number(quantity),
-                price: Number(price),
+                price: Number(effectivePrice),
                 currency: currencyFromSymbol(normalizedSymbol),
                 fee: Number(fee) || 0,
                 date,
@@ -153,7 +150,7 @@ export function AddTransactionForm({portfolioId, editing = null, onCancelEdit}: 
             min="0"
             step="any"
             required
-            value={price}
+            value={effectivePrice}
             onChange={(e) => {
               setPriceTouched(true);
               setPrice(e.target.value);

@@ -13,6 +13,7 @@ import ChartPage from "./pages/ChartPage";
 import RiskPage from "./pages/RiskPage";
 import FactorsPage from "./pages/FactorsPage";
 import ResearchPage from "./pages/ResearchPage";
+import DataPage from "./pages/DataPage";
 
 export function AppRoutes() {
   return (
@@ -31,6 +32,7 @@ export function AppRoutes() {
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/vol" element={<VolPage />} />
           <Route path="/events" element={<EventsPage />} />
+          <Route path="/data" element={<DataPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

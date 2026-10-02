@@ -1,5 +1,12 @@
 import {describe, expect, it} from "vitest";
-import {atmStraddle, frontMonthExpiry, ivRank} from "../impliedSnapshot.service";
+import {atmStraddle, frontMonthExpiry, ivRank, missedSessions} from "../impliedSnapshot.service";
+
+describe("missedSessions", () => {
+    it("lists exchange sessions after the first recording that have no row", () => {
+        const calendar = ["2026-09-24", "2026-09-25", "2026-09-28", "2026-09-29", "2026-09-30"];
+        expect(missedSessions(calendar, ["2026-09-25", "2026-09-29"], "2026-09-25")).toEqual(["2026-09-28", "2026-09-30"]);
+    });
+});
 
 describe("atmStraddle", () => {
     const calls = [

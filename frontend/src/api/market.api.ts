@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { Currency, IvSurface, SymbolSearchHit, TickerQuote } from "../types/api.types";
+import type { Currency, DataHealth, IvSurface, SymbolSearchHit, TickerQuote } from "../types/api.types";
 
 export async function searchSymbols(query: string): Promise<SymbolSearchHit[]> {
   const {data} = await apiClient.get<SymbolSearchHit[]>("/market/search", {
@@ -34,5 +34,10 @@ export async function getIvSurface(symbol: string): Promise<IvSurface> {
     params: {symbol},
     timeout: 60_000,
   });
+  return data;
+}
+
+export async function getDataHealth(): Promise<DataHealth> {
+  const {data} = await apiClient.get<DataHealth>("/market/health");
   return data;
 }

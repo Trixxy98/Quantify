@@ -2,6 +2,7 @@ import {Router} from "express";
 import {authMiddleware} from "../middleware/auth.middleware";
 import {
     getCloseHandler,
+    getDataHealthHandler,
     getIvSurfaceHandler,
     getQuotesHandler,
     searchSymbolsHandler,
@@ -14,3 +15,4 @@ marketRouter.get("/search", searchSymbolsHandler);
 marketRouter.get("/close", getCloseHandler);
 marketRouter.get("/quotes", getQuotesHandler);
 marketRouter.get("/iv-surface", getIvSurfaceHandler);
+marketRouter.get("/health", getDataHealthHandler);
