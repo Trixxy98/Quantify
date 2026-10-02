@@ -2,6 +2,7 @@ import YahooFinance from "yahoo-finance2";
 import {Currency} from "@prisma/client";
 import {prisma} from "../lib/prisma";
 import {isRebased} from "./corporateActions";
+import {fxBarDate, isWeekendDate} from "./fx";
 
 // v3: default export is a class — instantiate first
 export const yahooFinance = new YahooFinance();
@@ -154,19 +155,40 @@ export async function syncBenchmarkPrices(symbol: string, from: Date) {
 }
 
 export async function syncUsdMyrRate(from: Date) {
-    const bars = await fetchDailyBars(USD_MYR_SYMBOL, from);
-    const fromDate = toUtcDate(from);
+    // Rows written while bars were dated by the UTC day sit one day early, some
+    // on weekends. Seeing any weekend row means the whole stored range is
+    // rewritten once; after that no weekend row can be written.
+    const stored = await prisma.exchangeRate.findMany({
+        where: {from: Currency.USD, to: Currency.MYR},
+        orderBy: {date: "asc"},
+        select: {date: true},
+    });
+    const shifted = stored.some((row) => isWeekendDate(row.date));
+    const start = shifted && stored[0].date < from ? stored[0].date : from;
+    if (shifted) {
+        console.warn("[sync] USD/MYR rows are dated a day early — rewriting stored FX history");
+    }
+
+    const bars = await fetchDailyBars(USD_MYR_SYMBOL, start);
+    const fromDate = toUtcDate(start);
+    // The live bar and the session bar can land on the same London day; the later quote wins.
+    const byDate = new Map<number, {date: Date; rate: number}>();
+    for (const bar of bars) {
+        const date = fxBarDate(bar.date);
+        if (isWeekendDate(date) || date < fromDate) continue;
+        byDate.set(date.getTime(), {date, rate: bar.close!});
+    }
 
     await prisma.$transaction([
         prisma.exchangeRate.deleteMany({
             where: {from: Currency.USD, to: Currency.MYR, date: {gte: fromDate}},
         }),
         prisma.exchangeRate.createMany({
-            data: bars.map((bar) => ({
+            data: [...byDate.values()].map((row) => ({
                 from: Currency.USD,
                 to: Currency.MYR,
-                date: toUtcDate(bar.date),
-                rate: bar.close!,
+                date: row.date,
+                rate: row.rate,
             })),
             skipDuplicates: true,
         }),

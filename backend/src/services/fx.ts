@@ -3,6 +3,28 @@ import {prisma} from "../lib/prisma";
 
 export type SeriesPoint = {date: number; close: number};
 
+const londonDay = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+});
+
+/**
+ * Yahoo stamps daily FX bars at London midnight, which is 23:00 UTC the day
+ * before during British Summer Time. Dating them by the UTC day would file
+ * each rate one day early, so they are dated by the London day instead.
+ */
+export function fxBarDate(timestamp: Date): Date {
+    return new Date(`${londonDay.format(timestamp)}T00:00:00.000Z`);
+}
+
+/** For UTC-midnight date-only values. FX does not trade on weekends. */
+export function isWeekendDate(date: Date): boolean {
+    const weekday = date.getUTCDay();
+    return weekday === 0 || weekday === 6;
+}
+
 export function latestAtOrBefore(series: SeriesPoint[], time: number): number | null {
     let result: number | null = null;
     for (const point of series) {

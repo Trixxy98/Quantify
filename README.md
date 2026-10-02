@@ -153,6 +153,7 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 ## Notes
 
 - Upgrading an existing database: run `npm run prisma:migrate`, then one **Sync**. Splits, dividends and `^SP500TR` are empty until that pass, so dividends read as zero and the chart falls back to the S&P price index.
+- USD/MYR bars are dated by the London day, because Yahoo stamps them at London midnight (23:00 UTC in summer). A database synced before this fix has FX rows a day early; the next sync sees the weekend-dated rows and rewrites the stored FX range once.
 - First save of a **new** ticker waits on Yahoo; editing qty on a known name is mostly a snapshot rebuild.
 - Charts and metrics need price history. If a range is empty, Sync or pick a longer range.
 - Refresh tokens live in client storage (fine for local use, not a production auth story).

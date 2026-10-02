@@ -42,7 +42,7 @@ Every module below follows the same rules. If a proposed feature cannot satisfy 
 | Research | Variance premium: term-structure implied move vs realized event moves | done | IV rank blank until 20 recorded sessions |
 | Research | Fama–French 5 + momentum on the US sleeve, walk-forward harness, cost model | done | Factors page. French data through the last monthly file. Loadings need 120 sessions |
 | Research | 12-1 momentum, walk-forward, after costs | done | Research page. Fixed 30-name basket dated 2026-01-01, or the portfolio's US holdings |
-| Data | Data quality page | done | Data page. Found the USD/MYR one-day date shift (see Phase E) |
+| Data | Data quality page | done | Data page. Found the USD/MYR one-day date shift, now fixed (see Phase E) |
 | Tooling | Chart workspace, saved views | done | |
 | Tests | Vitest across metrics, corporate actions, lots, risk math, premium, IV snapshot, OLS, walk-forward, momentum | done | |
 
@@ -215,8 +215,10 @@ sorted worst first.
   the calendar when at least two of the market's series were live and none has a bar, and the page says so.
 - Added a weekend-dated-rows check. It found the first real defect: Yahoo stamps `MYR=X` daily bars at 23:00 UTC,
   which is London midnight in summer time, so the sync stores each rate one calendar day early from about March to
-  October (Monday's rate under Sunday, Friday's under Thursday). A valuation on day D reads D+1's rate. Fix belongs
-  in `syncUsdMyrRate` (date the bar in Europe/London), followed by a full FX refetch; not done yet.
+  October (Monday's rate under Sunday, Friday's under Thursday). A valuation on day D read D+1's rate. Fixed:
+  `fxBarDate` dates FX bars by the London day, and a sync that sees any weekend-dated FX row rewrites the stored
+  range once. On this database weekend rows went 55 → 0 and missing FX days 58 → 2 (Easter 2025, a Yahoo gap);
+  Mon–Thu snapshots moved slightly, Fridays did not (they had fallen back to Thursday's row, which held Friday's rate).
 - Only IV gaps in the last 20 US sessions colour a row, since the older ones can never be filled.
 
 ---
