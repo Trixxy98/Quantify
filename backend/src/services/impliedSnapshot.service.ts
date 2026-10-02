@@ -155,18 +155,41 @@ export async function captureImpliedSnapshots(symbols: string[]): Promise<{attem
     return {attempted: usSymbols.length, recorded};
 }
 
+/** Sessions in `calendar` on or after `since` that have no recorded row. */
+export function missedSessions(calendar: string[], recorded: string[], since: string): string[] {
+    const have = new Set(recorded);
+    return calendar.filter((date) => date >= since && !have.has(date));
+}
+
+/** US trading days from the ^GSPC bars, which follow the exchange calendar including holidays. */
+async function usSessionsSince(since: Date): Promise<string[]> {
+    const rows = await prisma.benchmarkPrice.findMany({
+        where: {symbol: "^GSPC", date: {gte: since}},
+        orderBy: {date: "asc"},
+        select: {date: true},
+    });
+    return rows.map((row) => toDateKey(row.date));
+}
+
 /** IV rank from the rows this app has recorded. Null until enough sessions exist. */
-export async function getIvHistory(symbol: string): Promise<{history: IvHistory | null; recorded: number; since: string | null}> {
+export async function getIvHistory(
+    symbol: string
+): Promise<{history: IvHistory | null; recorded: number; since: string | null; missed: string[]}> {
     const rows = await prisma.impliedSnapshot.findMany({
         where: {symbol},
         orderBy: {date: "desc"},
         take: IV_RANK_LOOKBACK,
         select: {date: true, atmIv: true, expiry: true},
     });
-    if (rows.length === 0) return {history: null, recorded: 0, since: null};
+    if (rows.length === 0) return {history: null, recorded: 0, since: null, missed: []};
 
     const since = toDateKey(rows[rows.length - 1].date);
-    if (rows.length < IV_RANK_MIN_SESSIONS) return {history: null, recorded: rows.length, since};
+    const missed = missedSessions(
+        await usSessionsSince(rows[rows.length - 1].date),
+        rows.map((row) => toDateKey(row.date)),
+        since
+    );
+    if (rows.length < IV_RANK_MIN_SESSIONS) return {history: null, recorded: rows.length, since, missed};
 
     const series = rows.map((row) => ({iv: Number(row.atmIv)}));
     const current = series[0].iv;
@@ -174,6 +197,7 @@ export async function getIvHistory(symbol: string): Promise<{history: IvHistory 
     return {
         recorded: rows.length,
         since,
+        missed,
         history: {
             n: rows.length,
             since,

@@ -173,6 +173,19 @@ model ImpliedSnapshot {
   @@index([symbol, date])
 }
 
+// One row per full sync. The daily cron lives in the API process, so a laptop
+// that was asleep at 6:30am misses the run; startup reads this to catch up.
+model SyncRun {
+  id         String    @id @default(cuid())
+  trigger    String // cron | manual | startup | script
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  ok         Boolean   @default(false)
+  error      String?
+
+  @@index([ok, finishedAt])
+}
+
 // Ken French daily factors, stored as fractions (the files publish percent).
 // US only. Refreshed from the data library; the tail lags by about a month.
 model FactorReturn {

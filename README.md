@@ -32,6 +32,7 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 - **Events** — event study around Fed days, CPI releases and earnings: market-model abnormal returns, CAR with a ±2 s.e. band, event-day vs other-day return distributions, an event-only trading rule, and today's ATM straddle versus the median realized move on past events (not a historical IV backtest)
 - Manual **Sync** still exists for a full market pass
 - Daily cron: 6:30am MYT, Tue–Sat (after the US close). It also records the front-month ATM implied vol of every US name (plus SPY) into `ImpliedSnapshot`, because Yahoo serves only today's chain — IV rank on the Events page is built from these rows and stays blank until 20 sessions exist
+- The cron lives in the API process, so it only fires if the API is up at 6:30. On startup the API checks the `SyncRun` table and syncs straight away if nothing has finished since the last US close. Sessions it was down for still have no IV row (the chain is gone), and the Events page lists them. See [Keeping the recorder running](#keeping-the-recorder-running) to sync without the API
 
 ## How numbers work
 
@@ -84,7 +85,7 @@ cp .env.example .env
 # Set JWT_ACCESS_SECRET and JWT_REFRESH_SECRET to ≥32 characters
 npm install
 npx prisma migrate dev
-npm run prisma:seed   # optional: extra sample trades for SEED_EMAIL (default harith@gmail.com)
+npm run prisma:seed   # optional: extra sample trades for SEED_EMAIL (default demo@quantify.local; register it first)
 npm run dev
 # http://localhost:4000  —  GET /health
 
@@ -119,9 +120,31 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 
 ## Scripts
 
-**Backend:** `npm run dev` · `npm run test` · `npm run typecheck` · `npm run prisma:migrate` · `npm run prisma:studio` · `npm run events:cpi` · `npm run factors:refresh`
+**Backend:** `npm run dev` · `npm run test` · `npm run typecheck` · `npm run prisma:migrate` · `npm run prisma:studio` · `npm run events:cpi` · `npm run factors:refresh` · `npm run sync:daily` (add `-- --force` to sync even if one already ran)
 
 **Frontend:** `npm run dev` · `npm run build` · `npm run lint`
+
+### Keeping the recorder running
+
+`npm run sync:daily` does the same pass as the cron without the API. It skips when a sync has already finished after the last US close, or when another process is mid-sync, so it is safe alongside the API's own job. On a Mac, save this as `~/Library/LaunchAgents/com.quantify.sync.plist` (fix the path) and run `launchctl load` on it. It fires at 07:00 local time, and launchd runs a missed job when the Mac wakes. Postgres must be up.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.quantify.sync</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string><string>-lc</string>
+    <string>cd /path/to/Stocks-portfolio/backend &amp;&amp; npm run sync:daily</string>
+  </array>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+  <key>StandardOutPath</key><string>/tmp/quantify-sync.log</string>
+  <key>StandardErrorPath</key><string>/tmp/quantify-sync.log</string>
+</dict>
+</plist>
+```
 
 ## Notes
 

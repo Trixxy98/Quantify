@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { useOutletContext } from "react-router-dom";
 import {
@@ -57,21 +57,23 @@ export default function ChartPage() {
   const [window, setWindow] = useState<ChartWindow>(60);
   const [scale, setScale] = useState<ChartScale>("index");
   const [series, setSeries] = useState<ChartSeriesPick[]>(DEFAULT_SERIES);
-  const [views, setViews] = useState<ChartView[]>([]);
+  const [views, setViews] = useState<ChartView[]>(() => readChartViews(portfolioId));
   const [activeViewId, setActiveViewId] = useState("");
   const [viewName, setViewName] = useState("");
+  const [viewsFor, setViewsFor] = useState(portfolioId);
+
+  if (viewsFor !== portfolioId) {
+    setViewsFor(portfolioId);
+    setSeries(DEFAULT_SERIES);
+    setViews(readChartViews(portfolioId));
+    setActiveViewId("");
+    setViewName("");
+  }
 
   const {data: performance, isLoading: isPerformanceLoading} = usePortfolioPerformance(portfolioId, range);
   const {data: risk, isLoading: isRiskLoading} = usePortfolioRisk(portfolioId, range, window);
   const {data: holdings} = useHoldings(portfolioId);
   const {data: closed} = useClosedLots(portfolioId);
-
-  useEffect(() => {
-    setSeries(DEFAULT_SERIES);
-    setViews(readChartViews(portfolioId));
-    setActiveViewId("");
-    setViewName("");
-  }, [portfolioId]);
 
   const symbols = useMemo(() => {
     const names = [
@@ -192,7 +194,7 @@ export default function ChartPage() {
     const plotted = new Map<string, Map<string, number>>();
     for (const item of series) {
       const seriesKind = kind(item.id);
-      let points: LevelPoint[] = [];
+      let points: LevelPoint[];
       if (seriesKind === "level") {
         points = rebase(levels.get(item.id) ?? [], scale);
       } else if (item.id === "underwater") {

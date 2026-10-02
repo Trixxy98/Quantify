@@ -35,6 +35,7 @@ Every module below follows the same rules. If a proposed feature cannot satisfy 
 | Data | Splits, dividends, rebase detection | done | `corporateActions.ts`, `market.service.ts` |
 | Data | `^SP500TR` benchmark | done | KLCI stays price-only |
 | Data | Daily ATM implied vol recorder | done | `ImpliedSnapshot`, front month ≥ 20d, SPY always recorded. First row 2026-09-25 |
+| Data | Recorder reliability | done | `SyncRun` table; API syncs on startup if nothing finished since the last US close; `npm run sync:daily` for launchd. Sessions from 2026-09-28 until the first catch-up have no IV row and are listed on Events, not filled |
 | Measurement | TWR with dividend income, realized P&L, closed lots | done | |
 | Risk | Correlation, GK vs C2C vol, MCTR/CCTR, VaR/ES + Kupiec, drawdowns, rolling vol/beta | done | `risk.math.ts`, `risk.service.ts` |
 | Research | Event study (FOMC / CPI / earnings), event-only rule | done | |
@@ -170,7 +171,7 @@ intensity in [0, 1]; weights sum to 1 and are non-negative.
 
 ---
 
-### Phase D — Bootstrap intervals `next`
+### Phase D — Bootstrap intervals `planned`
 
 **Why.** Sharpe's asymptotic SE and CAR's ±2 s.e. assume independence. Drawdown has no interval at all. Block
 bootstrap gives honest intervals for all three with one method.
@@ -188,14 +189,16 @@ bootstrap gives honest intervals for all three with one method.
 
 ---
 
-### Phase E — Data quality page `planned`
+### Phase E — Data quality page `next`
 
 **Why.** Every check below already exists as a log line or an implicit assumption. Making them visible turns "the
-number looks wrong" into a five-second diagnosis.
+number looks wrong" into a five-second diagnosis. Moved ahead of D after the recorder silently stopped for a week
+in September 2026: a gap nobody can see is worse than an interval nobody has yet.
 
 **Scope** Per symbol: last close date and staleness in sessions; missing sessions vs the exchange calendar; splits
 recorded and whether a rebase was triggered; dividends with no bar on the ex-date; FX gaps; IV snapshot count and
-last date. One table, red/amber/green, sorted worst first.
+last date, plus missed IV sessions. Last `SyncRun` per trigger with its error, if any. One table, red/amber/green,
+sorted worst first.
 
 **API** `GET /api/market/health`
 
@@ -228,7 +231,8 @@ as descriptive; no significance claims below 30 trades.
 | Chat that only composes Chart workspace views | deferred | Low value relative to effort |
 | Bursa factor model | deferred | No public daily factor set; would have to be constructed and could not be validated |
 | Intraday data, order routing, live feeds | rejected | Principle 6 |
-| CSV broker import, CI pipeline, production auth | deferred | Engineering, not research; revisit when the research layer is done |
+| CI pipeline | planned | GitHub Actions: backend tests and typecheck, frontend typecheck and lint. Cheap, and 100+ tests that only run locally prove less |
+| CSV broker import, production auth | deferred | Engineering, not research; revisit when the research layer is done |
 | Historical IV backfill from a proxy (e.g. realized vol) | rejected | Principle 7 |
 
 ---
@@ -240,11 +244,13 @@ A  factors + walk-forward + costs
 └─ B  momentum (needs A for alpha control, harness, costs)
    └─ D  bootstrap (adds intervals to B's results; also to Overview and Events)
 C  ERC  (independent; needs only existing covariance)
-E  data quality (independent)
+E  data quality (independent; uses SyncRun and the missed-session check)
 F  trade quality (independent; needs only transactions and prices)
+CI (independent)
 ```
 
-A → B → D is the research spine. C, E, F can be picked up in any gap.
+A → B → D is the research spine. E comes next because the data under the spine has to be visibly sound first; CI can
+land alongside it. C and F can be picked up in any gap.
 
 ---
 

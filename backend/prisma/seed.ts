@@ -15,7 +15,7 @@ function currencyFromSymbol(symbol: string): Currency {
     return symbol.endsWith(".KL") ? Currency.MYR : Currency.USD;
 }
 
-const SEED_EMAIL = process.env.SEED_EMAIL ?? "harith@gmail.com";
+const SEED_EMAIL = process.env.SEED_EMAIL ?? "demo@quantify.local";
 
 const TRADES: {
     symbol: string;
