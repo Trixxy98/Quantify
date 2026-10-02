@@ -43,6 +43,7 @@ Every module below follows the same rules. If a proposed feature cannot satisfy 
 | Research | Fama–French 5 + momentum on the US sleeve, walk-forward harness, cost model | done | Factors page. French data through the last monthly file. Loadings need 120 sessions |
 | Research | 12-1 momentum, walk-forward, after costs | done | Research page. Fixed 30-name basket dated 2026-01-01, or the portfolio's US holdings |
 | Data | Data quality page | done | Data page. Found the USD/MYR one-day date shift, now fixed (see Phase E) |
+| Measurement | Block-bootstrap intervals for Sharpe, CAGR, max drawdown, event CAR, momentum Sharpe | done | See Phase D |
 | Tooling | Chart workspace, saved views | done | |
 | Tests | Vitest across metrics, corporate actions, lots, risk math, premium, IV snapshot, OLS, walk-forward, momentum | done | |
 
@@ -172,7 +173,7 @@ intensity in [0, 1]; weights sum to 1 and are non-negative.
 
 ---
 
-### Phase D — Bootstrap intervals `next`
+### Phase D — Bootstrap intervals `done`
 
 **Why.** Sharpe's asymptotic SE and CAR's ±2 s.e. assume independence. Drawdown has no interval at all. Block
 bootstrap gives honest intervals for all three with one method.
@@ -187,6 +188,18 @@ bootstrap gives honest intervals for all three with one method.
 **Tests** Resampled series preserves mean within tolerance; block boundaries wrap; seed reproducibility.
 
 **Out of scope** Bayesian intervals, analytic drawdown distributions.
+
+**Built** `research/bootstrap.ts`: Mulberry32 seed 1, mean block 20, 2,000 resamples, intervals withheld below 60
+observations. Deviations from the scope above:
+
+- The event-study CAR does not use the stationary bootstrap. Events are not a time series, and stocks reacting to
+  the same FOMC date are correlated, so it resamples whole event dates (cluster bootstrap, at least 8 dates).
+- Every interval is the 5th–95th percentile, so the UI labels it "90%", not the 95% that ±2 s.e. implies.
+- Overview, Research (card hint and a "Sharpe 90% range" column) and Events (CAR card hint) show the ranges.
+
+First live read: 1Y Sharpe 1.86, 90% [0.52, 3.10]; ALL-range CAGR 36.9%, 90% [−2.4%, 86.7%]. Momentum strategy
+Sharpe 1.11 [0.67, 1.61] against buy-and-hold 1.13 [0.66, 1.63], so the two cannot be told apart. FOMC CAR+5 0.4%,
+90% [−0.5%, 1.2%] over 40 dates.
 
 ---
 
@@ -237,7 +250,7 @@ as descriptive; no significance claims below 30 trades.
 
 ---
 
-### Phase G — Specialist forecasting agents and a manager `planned`
+### Phase G — Five specialist agents, an orchestrator and a decision engine `next`
 
 **Why.** The natural next question after "does one signal work" is "do several specialists, combined, forecast
 anything?". Each agent here is a statistical model with one job and a public track record, not a language model with
@@ -245,9 +258,43 @@ opinions. The deliverable is the scoreboard: which agents have out-of-sample ski
 whether combining them beats the best single one. An honest "most of them have no edge" is a valid result
 (principle 5).
 
+**Flow**
+
+```
+Market data (prices, factors, events, recorded IV, recorded headlines)   ← existing sync + headline recorder
+        │
+Orchestrator      runs each agent, validates its output, logs an AgentRun row
+        │
+  ┌─────────┬─────────┬─────────┬─────────┬───────────┐
+Technical  Quant     Event     Risk      Sentiment       ← five specialists, statistical models
+  └─────────┴─────────┴─────────┴─────────┴───────────┘
+        │
+Decision engine   combines forecasts, applies risk limits, resolves conflicts, records the reason
+        │
+Agents page       scoreboard, decisions with their reasons, simulated portfolio vs comparators
+```
+
+No language model produces a number anywhere in this flow. The stack is the existing one: TypeScript models in
+`backend/src/research/`, Postgres via Prisma, the existing `node-cron` job, Express, React. No Python service, task
+queue or Redis (principle 6); five agents over about 40 names run in seconds inside the cron.
+
+**Orchestrator**
+
+- `runAgents(asOf, trigger)` loads the data once, then runs each agent in turn. Each agent is a function from that
+  data to forecasts; it does no I/O of its own.
+- Every output is validated with zod before it is used: symbols in the universe, finite values, probabilities in
+  [0, 1], one row per (agent, symbol, horizon).
+- Each agent run writes an `AgentRun` row (agent, asOf, trigger, started, finished, ok, error, rows, model
+  version), the same pattern as `SyncRun`. A failing agent does not stop the others; the decision engine runs on the
+  agents that succeeded and the page names the ones that did not.
+- Triggered by the month-end step of the daily cron, and by `npm run agents:run` for a manual pass. Skips if an
+  `AgentRun` for the same `asOf` already succeeded, so a restart does not double-record.
+
 **Common contract**
 
-- Horizon: one month, rebalanced at month end, same calendar as Phase B. Universe: the dated 30-name basket, plus
+- Primary horizon: one month, rebalanced at month end, same calendar as Phase B. Secondary horizon: five sessions,
+  reported alongside after the same costs, never used for decisions. The secondary result is there to show what
+  shorter horizons do to turnover, not to pick the better-looking one. Universe: the dated 30-name basket, plus
   the portfolio's US holdings when there are at least three.
 - Every agent emits one forecast per (symbol, month end) using only data available at that close. Features are
   lagged one session; a shift test proves it (as in Phase B).
@@ -260,56 +307,83 @@ whether combining them beats the best single one. An honest "most of them have n
 
 | Agent | Forecasts | Model | Inputs | Must beat |
 | --- | --- | --- | --- | --- |
-| Trend | Next-month return rank | Ridge, cross-sectional | 1, 3, 6 and 12-1 month returns; distance from 200-day mean | Plain 12-1 rank (Phase B) |
-| Factor | Next-month return rank | Rolling FF5 + Mom loadings × trailing 12-month factor premia | Stored Ken French factors | Zero forecast |
-| Volatility | Next 21-session realized vol | HAR (Corsi 2009) by OLS | Daily, weekly, monthly Garman–Klass vol; recorded ATM IV once 252 sessions exist | Trailing 21-session vol |
-| Event | Next-month return rank and vol uplift | Per-name mean abnormal return and move size on past events of the types scheduled inside the month | Event study (FOMC, CPI, earnings) | Zero forecast |
-| Risk | Probability the market falls ≥ 5% peak to trough within the month | Logistic regression (IRLS) | Index vol level, vol of vol, mean pairwise correlation, index trend | Base rate |
+| Technical | Next-period return rank | Ridge, cross-sectional | 1, 3, 6 and 12-1 month returns; distance from 200-day mean | Plain 12-1 rank (Phase B) |
+| Quant | Next-period return rank, and the probability of beating the universe median | Rolling FF5 + Mom loadings × trailing 12-month factor premia; probability by logistic regression on the same inputs | Stored Ken French factors | Zero forecast; 50% |
+| Event | Next-period return rank and vol uplift | Per-name mean abnormal return and move size on past events of the types scheduled inside the period | Event study (FOMC, CPI, earnings) | Zero forecast |
+| Risk | (a) Next-period realized vol per name; (b) probability the market falls ≥ 5% peak to trough within the period | (a) HAR (Corsi 2009) by OLS; (b) logistic regression (IRLS) | (a) Daily, weekly, monthly Garman–Klass vol, recorded ATM IV once 252 sessions exist; (b) index vol level, vol of vol, mean pairwise correlation, index trend | (a) Trailing vol; (b) base rate |
+| Sentiment | Next-period return rank | Net tone of recorded headlines over the trailing period, Loughran–McDonald finance word lists | Headlines recorded forward by the sync | Zero forecast |
 
-The Volatility agent needs only OHLC, so it also covers Bursa holdings. The return-rank agents stay US-only for the
-same reason as Phase A.
+The Risk agent's vol forecast needs only OHLC, so it also covers Bursa holdings. The return-rank agents stay US-only
+for the same reason as Phase A. The Portfolio role from the original sketch ("does the expected return justify the
+risk?") is the decision engine's job, so it is not a separate agent.
+
+**Sentiment is recorded forward.** Free news sources serve current headlines only, so the sync records them into a
+`NewsHeadline` table (symbol, published, title, publisher, source id unique) the same way `ImpliedSnapshot` is
+recorded (principle 7). The Sentiment agent emits forecasts from the first recorded month but gets no weight and no
+verdict until 12 scored months exist; until then the page shows recording progress. The word lists are free for
+non-commercial use, which covers this repo. Scoring headlines with a language model is deferred (section 4).
+
+**Index view.** The Quant and Risk agents also emit a forecast for `SPY` itself, shown separately as a market-timing
+view. One series gives far fewer independent tests than a 30-name cross-section, and the page says so beside it.
 
 **Scoring** (out-of-sample only, each with `n` and a Phase D bootstrap interval)
 
 - Return-rank agents: mean monthly Spearman IC with Newey–West SE, hit rate, top-minus-bottom third spread after
   costs. Power check stated on the page: with about 70 test months, mean IC needs to be roughly 0.035 or more to
   clear t = 2.
-- Volatility: QLIKE and MSE against the trailing-vol baseline, with a Diebold–Mariano test.
-- Risk: Brier skill score against the base rate, and a reliability table (forecast bucket vs observed frequency).
+- Risk (a): QLIKE and MSE against the trailing-vol baseline, with a Diebold–Mariano test.
+- Probabilities (Quant's beat-the-median, Risk (b)): Brier skill score against the naive rate, and a reliability
+  table (forecast bucket vs observed frequency). A "56%" is only reported as such if forecasts in that bucket came
+  true about that often.
 
-**Manager**
+**Decision engine**
 
-- Combines the return-rank agents with weights proportional to each one's trailing out-of-sample IC, floored at
-  zero and shrunk halfway toward equal weight. An agent with negative trailing IC gets no weight.
-- Sizes positions by inverse Volatility-agent forecast; cuts gross exposure by half when the Risk agent's
-  probability is above its own 80th percentile.
-- Long the top third, through the Phase A cost model, against buy-and-hold, equal weight, the best single agent and
-  `^SP500TR`. Reports Fama–French alpha like Phase B.
+Rules are fixed in advance and applied in this order. Each decision row records which rules fired.
 
-**Live record.** The backtest and the live record are shown separately. A month-end step in the cron writes each
-agent's forecasts to an `AgentForecast` table (agent, symbol, month, forecast, model version); rows are never
-updated. Live skill is scored only on those rows and starts the day this ships (principle 7).
+1. **Combine.** Return score per name = weighted mean of the return-rank agents' standardized forecasts. Weights are
+   proportional to each agent's trailing out-of-sample IC, floored at zero, shrunk halfway toward equal weight. An
+   agent with negative trailing IC, or without 12 scored months (Sentiment at first), gets no weight.
+2. **Conflict.** A name in the top third by score is held only if agents carrying at least half of the weight rank
+   it above the median. Otherwise it is skipped and recorded as "skipped: agents disagree".
+3. **Size.** Held names are weighted by inverse Risk-agent vol forecast, long-only, fully invested.
+4. **Risk limit.** When the Risk agent's drawdown probability is above its own trailing 80th percentile, gross
+   exposure is halved and the rest sits in cash.
+5. **Evaluate.** Through the Phase A cost model, against buy-and-hold, equal weight, the best single agent and
+   `^SP500TR`, with Fama–French alpha like Phase B.
 
-**API** `GET /api/research/agents` (scoreboard and manager), `GET /api/research/agents/:agent` (detail and current
-forecasts).
+The page explains each decision from the recorded rules, e.g. "Exposure halved: drawdown probability 0.31, above its
+80th percentile of 0.24. NVDA skipped: Technical and Event rank it top, Quant and Sentiment rank it below median."
+These sentences come from templates filled with the recorded numbers, not from a language model.
 
-**UI** **Agents** page: a scoreboard table with one row per agent (metric, `n`, value [5th, 95th], vs baseline,
-verdict in words); the manager's equity curve against the comparators; a table of the current month's forecasts for
-the holdings; the correlation between agents' forecasts, so it is visible when two "specialists" say the same thing.
+**Live record.** The backtest and the live record are shown separately. The orchestrator writes each agent's
+forecasts to `AgentForecast` (agent, symbol, asOf, horizon, value, model version) and each decision to
+`AgentDecision` (asOf, symbol, weight, rules fired); rows are never updated. Live skill is scored only on those rows
+and starts the day this ships (principle 7).
+
+**API** `GET /api/research/agents` (scoreboard, latest run status, decision engine result),
+`GET /api/research/agents/:agent` (detail and current forecasts), `GET /api/research/agents/decisions?asOf=`.
+
+**UI** **Agents** page: latest orchestrator run with each agent's status; a scoreboard with one row per agent and
+horizon (metric, `n`, value [5th, 95th], vs baseline, verdict in words); the decision engine's equity curve against
+the comparators; the current decisions with their reasons; the correlation between agents' forecasts, so it is
+visible when two "specialists" say the same thing; Sentiment recording progress until it is scored.
 
 **Delivery**
 
-- G1: harness wiring, `AgentForecast` table, Trend and Volatility agents, scoreboard.
-- G2: Factor, Event and Risk agents.
-- G3: manager, live recording in the cron, Agents page complete.
+- G1: `AgentRun`, `AgentForecast` and `NewsHeadline` tables; orchestrator; headline recorder in the sync (first,
+  because only time fills it); Technical agent and Risk (a); scoreboard.
+- G2: Quant, Event and Risk (b); five-session horizon; index view.
+- G3: decision engine with `AgentDecision`, Sentiment agent, live recording at month end, Agents page complete.
 
-**Tests** Shift test per agent (prices moved one session later change the forecast; future prices never do); HAR
-recovers known coefficients on simulated data; logistic regression on a separable and a noisy synthetic set; IC
-equals 1 on a perfect ranking and about 0 on noise; manager weights sum to 1 and give zero to negative-IC agents;
-`AgentForecast` rows are append-only.
+**Tests** Shift test per agent (prices moved one session later change the forecast; future prices never do); zod
+rejects a malformed agent output and the run continues without that agent; a second orchestrator pass for the same
+`asOf` does nothing; HAR recovers known coefficients on simulated data; logistic regression on a separable and a
+noisy synthetic set; IC equals 1 on a perfect ranking and about 0 on noise; tone scoring on hand-labelled headlines;
+decision rules on a synthetic case for each rule, including a skipped conflict and a halved exposure; weights sum to
+1 and give zero to negative-IC agents; forecast and decision rows are append-only.
 
-**Out of scope** Language-model forecasts, deep learning, gradient boosting (no dependency-free implementation
-worth trusting yet), news or sentiment, intraday features, parameter sweeps.
+**Out of scope** Language-model forecasts, deep learning, gradient boosting (no dependency-free implementation worth
+trusting yet), a Python service, task queues, intraday features, parameter sweeps.
 
 ---
 
@@ -327,7 +401,8 @@ worth trusting yet), news or sentiment, intraday features, parameter sweeps.
 | Historical IV backfill from a proxy (e.g. realized vol) | rejected | Principle 7 |
 | Language-model agents that forecast prices | rejected | No measurable skill, and their training data contains the "future" of any backtest window, so the test leaks. Principles 1 and 2 |
 | Language-model analyst over Phase G | deferred | Only to describe the agents' numbers, never to produce one. Needs an API key and per-call cost |
-| Sentiment agent | deferred | No news or social data source in the app |
+| Language-model headline scoring for the Sentiment agent | deferred | Word lists first, because they are testable and free; a local model (Ollama) could be compared against them later on the same recorded headlines |
+| Python ML service, BullMQ + Redis, Fastify, TimescaleDB | rejected for now | One more runtime, a queue and a store for a workload that runs in seconds on ~100k rows. Express and Postgres already cover it (principle 6) |
 | Gradient-boosted agents | deferred | After G, if a linear agent shows skill worth trying to improve |
 
 ---
@@ -338,15 +413,15 @@ worth trusting yet), news or sentiment, intraday features, parameter sweeps.
 A  factors + walk-forward + costs
 └─ B  momentum (needs A for alpha control, harness, costs)
    └─ D  bootstrap (adds intervals to B's results; also to Overview and Events)
-      └─ G  forecasting agents + manager (needs A's harness and costs, B's calendar and signal, D's intervals)
+      └─ G  five agents + orchestrator + decision engine (needs A's harness and costs, B's calendar and
+            signal, D's intervals; G1's headline recorder can start earlier, since only time fills it)
 C  ERC  (independent; needs only existing covariance)
 E  data quality (independent; uses SyncRun and the missed-session check)
 F  trade quality (independent; needs only transactions and prices)
 CI (independent)
 ```
 
-A → B → D → G is the research spine. E comes next because the data under the spine has to be visibly sound first; CI can
-land alongside it. C and F can be picked up in any gap.
+A → B → D → G is the research spine. A, B, D, E and CI are done; G1 is next. C and F can be picked up in any gap.
 
 ---
 

@@ -20,7 +20,7 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 - Multiple portfolios (create / rename / delete)
 - Transactions: add, edit, delete — holdings qty and avg cost are replayed from the ledger
 - After a trade: fetch that ticker (and FX/benchmarks if the cache is thin), then rebuild **this** portfolio’s snapshots
-- **Overview** — value, today, unrealized P&L, Sharpe (with its error bar), CAGR, vol, beta, alpha, max drawdown, dividends collected, vs blended KLCI/S&P 500 TR
+- **Overview** — value, today, unrealized P&L, Sharpe (with its error bar), CAGR, vol, beta, alpha, max drawdown (Sharpe, CAGR and drawdown with 90% block-bootstrap ranges), dividends collected, vs blended KLCI/S&P 500 TR
 - **Analysis** — contribution by name (stock vs FX), variance share, trailing beta; sliders for KLCI / S&P / USD-MYR (linear estimate, not a forecast)
 - **Risk** — correlation, Garman–Klass vs close-to-close vol, marginal and component risk, historical VaR / expected shortfall with a Kupiec breach test, underwater chart and worst drawdowns
 - **Factors** — Fama–French five-factor plus momentum regression of the US sleeve (USD), Newey–West t-stats, rolling 252-day loadings. Bursa holdings are excluded
@@ -55,6 +55,8 @@ Every risk figure on Overview is measured on the **time-weighted, dividend-inclu
 The US benchmark is `^SP500TR`, the total-return version of the index, because comparing a dividend-inclusive portfolio against a price index would hand the portfolio free alpha. `^GSPC` stays in the database for price-vs-price work (per-symbol beta on Analysis, event studies) and is used as a fallback on the chart until a sync has pulled `^SP500TR`.
 
 Sharpe ships with its asymptotic standard error, and Overview says so out loud when a range holds fewer than 60 daily observations. A Sharpe of 1.4 over three months is not a measurement.
+
+The standard error assumes independent days, which daily returns are not, and drawdown has no formula at all. So Sharpe, CAGR and max drawdown also carry a 90% range from a stationary block bootstrap (Politis–Romano): 2,000 resamples built from blocks of about 20 sessions, seeded so the numbers do not move between page loads. The same ranges appear on the momentum Sharpe (Research) and the final CAR (Events). The event study resamples whole event dates rather than days, because stocks reacting to the same Fed meeting are not independent of each other. Ranges are withheld below 60 observations or 8 event dates. Over the full history the demo book's CAGR range still includes zero.
 
 ### Corporate actions
 

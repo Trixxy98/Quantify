@@ -27,3 +27,12 @@ export function toneClass(value: number): string {
 export function formatPctAbs(value: number, digits = 2): string {
     return `${(value * 100).toFixed(digits)}%`;
 }
+
+/** Bootstrap 5th–95th percentile, labelled as the 90% interval it is. */
+export function formatInterval(
+    interval: {low: number; high: number} | null | undefined,
+    format: (value: number) => string
+): string | null {
+    if (!interval) return null;
+    return `90% [${format(interval.low)}, ${format(interval.high)}]`;
+}

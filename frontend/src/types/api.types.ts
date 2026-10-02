@@ -42,6 +42,15 @@ export type PortfolioSummary = {
     asOfDate: string | null;
 };
 
+/** 5th–95th percentile of bootstrap resamples, i.e. a 90% interval. */
+export type BootstrapInterval = {
+    low: number;
+    high: number;
+    resamples: number;
+    method: "stationary" | "cluster";
+    blockLength: number | null;
+};
+
 export type PortfolioMetrics = {
     range: Range;
     asOf: string;
@@ -54,6 +63,12 @@ export type PortfolioMetrics = {
     beta: number;
     alpha: number;
     maxDrawdown: number;
+    /** Stationary block bootstrap; null below 60 observations. */
+    intervals: {
+        sharpe: BootstrapInterval | null;
+        cagr: BootstrapInterval | null;
+        maxDrawdown: BootstrapInterval | null;
+    };
     /** Dividends collected inside the range, base currency. */
     dividendIncome: number;
     /** Daily observations behind the risk statistics. */
@@ -345,6 +360,8 @@ export type EventStudy = {
     eventCount: number;
     skippedCount: number;
     offsets: EventStudyOffset[];
+    /** Mean CAR at the last offset; the interval resamples event dates. */
+    finalCar: {offset: number; acar: number; dates: number; interval: BootstrapInterval | null};
     events: EventStudyRow[];
     distribution: {
         event: EventStudyStats;
@@ -434,6 +451,7 @@ export type MomentumStats = {
     volatility: number;
     sharpe: number;
     sharpeSe: number;
+    sharpeInterval: BootstrapInterval | null;
     maxDrawdown: number;
     hitRate: number | null;
     avgTurnover: number | null;

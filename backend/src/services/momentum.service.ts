@@ -17,6 +17,7 @@ import {
 import {FACTOR_NAMES} from "../research/french";
 import {momentumConclusion, runMomentum, type MomentumDay} from "../research/momentum";
 import {ols} from "../research/ols";
+import {BOOTSTRAP_BLOCK_LENGTH, BOOTSTRAP_RESAMPLES, stationaryBootstrap, type Interval} from "../research/bootstrap";
 
 const MIN_BARS = 400;
 const HISTORY_FROM = new Date("2015-01-01T00:00:00.000Z");
@@ -28,6 +29,7 @@ export type MomentumStats = {
     volatility: number;
     sharpe: number;
     sharpeSe: number;
+    sharpeInterval: Interval | null;
     maxDrawdown: number;
     hitRate: number | null;
     avgTurnover: number | null;
@@ -147,6 +149,7 @@ function stats(returns: number[], monthly: number[], turnovers: number[] | null)
         volatility: volatility(returns),
         sharpe: sharpeRatio(returns, env.RISK_FREE_RATE),
         sharpeSe: sharpeStandardError(returns, env.RISK_FREE_RATE),
+        sharpeInterval: stationaryBootstrap(returns, {sharpe: (sample) => sharpeRatio(sample, env.RISK_FREE_RATE)}).sharpe,
         maxDrawdown: maxDrawdown(equity),
         hitRate: monthly.length === 0 ? null : monthly.filter((ret) => ret > 0).length / monthly.length,
         avgTurnover: turnovers === null || turnovers.length === 0 ? null : turnovers.reduce((sum, value) => sum + value, 0) / turnovers.length,
@@ -279,6 +282,7 @@ export async function getMomentumStudy(input: {
         "12-1 momentum, rebalanced monthly, long the top third. The rank uses the close twelve months before formation over the close one month before it. Nothing in the holding month is an input, and the rule has no fitted parameter.",
         `Costs are ${input.commissionBps} bps commission plus ${input.slippageBps} bps slippage on the sum of absolute weight changes. Entering from cash costs one unit; replacing the book costs two.`,
         `Sharpe uses a constant ${(env.RISK_FREE_RATE * 100).toFixed(1)}% risk-free rate. The factor alpha subtracts Ken French's daily RF and uses Newey–West standard errors.`,
+        `Sharpe intervals are the 5th–95th percentile of ${BOOTSTRAP_RESAMPLES} stationary block bootstrap resamples (mean block ${BOOTSTRAP_BLOCK_LENGTH} sessions) of the out-of-sample daily returns. They keep volatility clustering that the ± SE ignores.`,
     ];
 
     let symbols: string[] = [];

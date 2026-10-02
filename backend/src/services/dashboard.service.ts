@@ -8,9 +8,11 @@ import {
     annualizedReturn,
     beta,
     cagr,
+    cagrFromReturns,
     compositeBenchmarkReturns,
     indexTo100,
     maxDrawdown,
+    maxDrawdownFromReturns,
     sharpeRatio,
     sharpeStandardError,
     timeWeightedIndex,
@@ -23,6 +25,7 @@ import {markOpenPositions} from "./valuation.service";
 import {realizePortfolio} from "./lots.service";
 import {latestAtOrBefore, loadUsdMyrSeries, toBase} from "./fx";
 import {type Range, resolveRangeStart, toDateKey} from "../utils/dateRange";
+import {stationaryBootstrap} from "../research/bootstrap";
 
 export type {Range};
 
@@ -363,6 +366,11 @@ export async function getMetrics(portfolioId: string, userId: string, range: Ran
         beta: betaValue,
         alpha: alphaValue,
         maxDrawdown: maxDrawdown(twr),
+        intervals: stationaryBootstrap(dailyReturns, {
+            sharpe: (sample) => sharpeRatio(sample, riskFree),
+            cagr: (sample) => cagrFromReturns(sample, years),
+            maxDrawdown: maxDrawdownFromReturns,
+        }),
         dividendIncome: rows.reduce((sum, row) => sum + row.income, 0),
         observations: dailyReturns.length,
         isLowConfidence: dailyReturns.length < LOW_CONFIDENCE_OBSERVATIONS,

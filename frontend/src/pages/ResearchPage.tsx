@@ -16,17 +16,20 @@ import {MetricCard} from "../components/dashboard/MetricCard";
 import type {AppShellContext} from "../components/layout/AppShell";
 import {useMomentum} from "../hooks/useMomentum";
 import type {MomentumStats} from "../types/api.types";
-import {formatNumber, formatPct, formatPctAbs} from "../utils/format";
+import {formatInterval, formatNumber, formatPct, formatPctAbs} from "../utils/format";
 
 const chip = (active: boolean) =>
     `rounded-md px-2.5 py-1 text-xs ${active ? "bg-[var(--color-accent)] text-slate-900" : "bg-[var(--color-surface)] text-[var(--color-text-muted)]"}`;
 
 function row(label: string, stats: MomentumStats | null) {
-    if (!stats) return {label, ann: "—", sharpe: "—", dd: "—", hit: "—", turn: "—"};
+    if (!stats) return {label, ann: "—", sharpe: "—", sharpeRange: "—", dd: "—", hit: "—", turn: "—"};
     return {
         label,
         ann: formatPct(stats.annualizedReturn),
         sharpe: `${formatNumber(stats.sharpe)} ± ${formatNumber(stats.sharpeSe)}`,
+        sharpeRange: stats.sharpeInterval
+            ? `${formatNumber(stats.sharpeInterval.low)} to ${formatNumber(stats.sharpeInterval.high)}`
+            : "—",
         dd: formatPct(stats.maxDrawdown),
         hit: stats.hitRate == null ? "—" : formatPctAbs(stats.hitRate, 0),
         turn: stats.avgTurnover == null ? "—" : formatPctAbs(stats.avgTurnover, 0),
@@ -115,7 +118,13 @@ export default function ResearchPage() {
                 <MetricCard
                     label="Sharpe"
                     value={data?.strategy ? formatNumber(data.strategy.sharpe) : "—"}
-                    hint={data?.strategy ? `± ${formatNumber(data.strategy.sharpeSe)}` : undefined}
+                    hint={
+                        data?.strategy
+                            ? [`± ${formatNumber(data.strategy.sharpeSe)}`, formatInterval(data.strategy.sharpeInterval, formatNumber)]
+                                  .filter(Boolean)
+                                  .join(" · ")
+                            : undefined
+                    }
                     isLoading={isLoading}
                 />
                 <MetricCard
@@ -206,6 +215,7 @@ export default function ResearchPage() {
                                 <th className="pb-2 font-medium">Book</th>
                                 <th className="pb-2 font-medium text-right">Annualized</th>
                                 <th className="pb-2 font-medium text-right">Sharpe</th>
+                                <th className="pb-2 font-medium text-right">Sharpe 90% range</th>
                                 <th className="pb-2 font-medium text-right">Max drawdown</th>
                                 <th className="pb-2 font-medium text-right">Hit rate</th>
                                 <th className="pb-2 font-medium text-right">Avg turnover</th>
@@ -217,6 +227,7 @@ export default function ResearchPage() {
                                     <td className="py-1.5">{item.label}</td>
                                     <td className="py-1.5 text-right tabular-nums">{item.ann}</td>
                                     <td className="py-1.5 text-right tabular-nums">{item.sharpe}</td>
+                                    <td className="py-1.5 text-right tabular-nums">{item.sharpeRange}</td>
                                     <td className="py-1.5 text-right tabular-nums">{item.dd}</td>
                                     <td className="py-1.5 text-right tabular-nums">{item.hit}</td>
                                     <td className="py-1.5 text-right tabular-nums">{item.turn}</td>

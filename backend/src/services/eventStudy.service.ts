@@ -2,6 +2,7 @@ import {AppError} from "../utils/AppError";
 import {average, covariance, stdDev, variance} from "../utils/stats.util";
 import {resolveEventDates, type EventDate, type EventType} from "./events.service";
 import {yahooFinance} from "./market.service";
+import {BOOTSTRAP_MIN_CLUSTERS, BOOTSTRAP_RESAMPLES, clusterBootstrap, type Interval} from "../research/bootstrap";
 
 const BURSA_BENCHMARK = "^KLSE";
 const US_BENCHMARK = "^GSPC";
@@ -80,6 +81,8 @@ export type EventStudy = {
     eventCount: number;
     skippedCount: number;
     offsets: OffsetStat[];
+    /** Mean CAR at the last offset, with a bootstrap interval that resamples event dates. */
+    finalCar: {offset: number; acar: number; dates: number; interval: Interval | null};
     events: EventRow[];
     distribution: {
         event: DistributionStats;
@@ -257,11 +260,28 @@ function buildHistogram(event: number[], baseline: number[]): HistogramBucket[] 
     }));
 }
 
+/** Every name reacting to the same date is one draw, so the interval does not count a Fed day five times. */
+export function finalCarInterval(events: {date: string; car: number}[], offset: number): EventStudy["finalCar"] {
+    const byDate = new Map<string, number[]>();
+    for (const event of events) {
+        const cluster = byDate.get(event.date);
+        if (cluster) cluster.push(event.car);
+        else byDate.set(event.date, [event.car]);
+    }
+    return {
+        offset,
+        acar: events.length > 0 ? average(events.map((event) => event.car)) : 0,
+        dates: byDate.size,
+        interval: clusterBootstrap([...byDate.values()], average),
+    };
+}
+
 function notesFor(type: EventType, symbols: string[], benchmark: string, hold: number): string[] {
     const notes = [
         `Abnormal return = actual return minus (alpha + beta x ${benchmark}), with alpha and beta fitted on the ${ESTIMATION_LEN} trading days ending ${ESTIMATION_GAP} days before each event.`,
         "Day 0 is the first trading session on or after the event date, so an announcement made after the close lands on day 0 of the next session.",
         `The backtest buys the close of day -1 and sells the close of day +${hold}. It is one path with no costs, no slippage and no position sizing — read the per-event spread, not the curve.`,
+        `The final CAR interval is the 5th–95th percentile of ${BOOTSTRAP_RESAMPLES} resamples of event dates, each date drawn with all its names, so a shock that hit every name at once counts once. Needs ${BOOTSTRAP_MIN_CLUSTERS} distinct dates.`,
     ];
     if (type === "EARNINGS") {
         notes.push(
@@ -503,6 +523,7 @@ export async function runEventStudy(params: EventStudyParams): Promise<EventStud
         eventCount: events.length,
         skippedCount,
         offsets: offsetStats,
+        finalCar: finalCarInterval(events, params.post),
         events,
         distribution: {
             event: describe(eventDayReturns),
