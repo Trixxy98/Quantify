@@ -1,5 +1,10 @@
 import {apiClient} from "./client";
-import type {MomentumStudy} from "../types/api.types";
+import type {AgentsOverview, MomentumStudy} from "../types/api.types";
+
+export async function getAgents(): Promise<AgentsOverview> {
+    const {data} = await apiClient.get<AgentsOverview>("/research/agents", {timeout: 120_000});
+    return data;
+}
 
 export type MomentumQuery = {
     portfolioId?: string;

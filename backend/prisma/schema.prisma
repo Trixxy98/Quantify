@@ -186,6 +186,60 @@ model SyncRun {
   @@index([ok, finishedAt])
 }
 
+// One row per agent per month-end pass of the orchestrator. A failed agent
+// leaves ok = false with its error; the other agents still run.
+model AgentRun {
+  id           String    @id @default(cuid())
+  agent        String // technical | risk
+  asOf         DateTime  @db.Date // month-end session the forecasts are made at
+  trigger      String // cron | manual | startup | script
+  modelVersion String
+  startedAt    DateTime  @default(now())
+  finishedAt   DateTime?
+  ok           Boolean   @default(false)
+  error        String?
+  rows         Int       @default(0)
+
+  forecasts AgentForecast[]
+
+  @@index([agent, asOf])
+}
+
+// Live record of what each agent said at a month end, written before the
+// outcome is known. Rows are only ever inserted, never updated.
+model AgentForecast {
+  id           String   @id @default(cuid())
+  runId        String
+  run          AgentRun @relation(fields: [runId], references: [id])
+  agent        String
+  symbol       String
+  asOf         DateTime @db.Date
+  horizon      String // 1m
+  target       String // returnScore | vol
+  value        Decimal  @db.Decimal(18, 10)
+  modelVersion String
+  createdAt    DateTime @default(now())
+
+  @@unique([agent, symbol, asOf, horizon, target])
+  @@index([agent, asOf])
+}
+
+// Yahoo serves current headlines only, so the sync records them forward for
+// the Sentiment agent. One headline can be filed under several symbols.
+model NewsHeadline {
+  id         String   @id @default(cuid())
+  symbol     String
+  sourceId   String // Yahoo uuid
+  published  DateTime
+  title      String
+  publisher  String
+  link       String?
+  recordedAt DateTime @default(now())
+
+  @@unique([symbol, sourceId])
+  @@index([symbol, published])
+}
+
 // Ken French daily factors, stored as fractions (the files publish percent).
 // US only. Refreshed from the data library; the tail lags by about a month.
 model FactorReturn {

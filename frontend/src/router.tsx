@@ -14,6 +14,7 @@ import RiskPage from "./pages/RiskPage";
 import FactorsPage from "./pages/FactorsPage";
 import ResearchPage from "./pages/ResearchPage";
 import DataPage from "./pages/DataPage";
+import AgentsPage from "./pages/AgentsPage";
 
 export function AppRoutes() {
   return (
@@ -33,6 +34,7 @@ export function AppRoutes() {
           <Route path="/vol" element={<VolPage />} />
           <Route path="/events" element={<EventsPage />} />
           <Route path="/data" element={<DataPage />} />
+          <Route path="/agents" element={<AgentsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

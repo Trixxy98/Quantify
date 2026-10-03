@@ -17,6 +17,7 @@
     "events:cpi": "tsx scripts/fetchCpiDates.ts",
     "factors:refresh": "tsx scripts/refreshFactors.ts",
     "sync:daily": "tsx scripts/syncDaily.ts",
+    "agents:run": "tsx scripts/runAgents.ts",
     "prisma:studio": "prisma studio"
   },
   "dependencies": {

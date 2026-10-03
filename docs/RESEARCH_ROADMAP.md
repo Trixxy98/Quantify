@@ -44,6 +44,7 @@ Every module below follows the same rules. If a proposed feature cannot satisfy 
 | Research | 12-1 momentum, walk-forward, after costs | done | Research page. Fixed 30-name basket dated 2026-01-01, or the portfolio's US holdings |
 | Data | Data quality page | done | Data page. Found the USD/MYR one-day date shift, now fixed (see Phase E) |
 | Measurement | Block-bootstrap intervals for Sharpe, CAGR, max drawdown, event CAR, momentum Sharpe | done | See Phase D |
+| Research | Agents G1: orchestrator, Technical and Risk (a) agents, scoreboard, live forecast record | done | Agents page. Live record from 2026-09-30. Headlines recorded forward from 2026-10-03 |
 | Tooling | Chart workspace, saved views | done | |
 | Tests | Vitest across metrics, corporate actions, lots, risk math, premium, IV snapshot, OLS, walk-forward, momentum | done | |
 
@@ -370,8 +371,8 @@ visible when two "specialists" say the same thing; Sentiment recording progress 
 
 **Delivery**
 
-- G1: `AgentRun`, `AgentForecast` and `NewsHeadline` tables; orchestrator; headline recorder in the sync (first,
-  because only time fills it); Technical agent and Risk (a); scoreboard.
+- G1 (`done`): `AgentRun`, `AgentForecast` and `NewsHeadline` tables; orchestrator; headline recorder in the sync
+  (first, because only time fills it); Technical agent and Risk (a); scoreboard.
 - G2: Quant, Event and Risk (b); five-session horizon; index view.
 - G3: decision engine with `AgentDecision`, Sentiment agent, live recording at month end, Agents page complete.
 
@@ -384,6 +385,49 @@ decision rules on a synthetic case for each rule, including a skipped conflict a
 
 **Out of scope** Language-model forecasts, deep learning, gradient boosting (no dependency-free implementation worth
 trusting yet), a Python service, task queues, intraday features, parameter sweeps.
+
+**Built (G1)** Pure code in `research/agents/`; data loading, the month-end pass and the overview in
+`services/agents.service.ts`; headlines in `services/headlines.service.ts`; Agents page.
+
+Fixed hyperparameters, as promised above:
+
+- Technical: features standardised across names each month and capped at ±3; target is next month's total-return
+  rank scaled to [−0.5, 0.5]; ridge penalty from {0.01, 0.1, 1, 10} on mean-squared-error scale, picked by the best
+  mean IC over the last 24 training months (two yearly inner folds, ties to the stronger penalty).
+- Risk (a): HAR in variance levels by OLS, per name, on daily rows whose target is the mean Garman–Klass variance of
+  the next 22 sessions. Forecasts are floored at the calmest 22-session stretch in training.
+- Both: expanding window, 60 month ends before the first forecast, refit every 12; a training row is used only if its
+  outcome was complete before the first test month's inputs were read (features are read one session before the
+  month-end close).
+- Scoring: monthly Newey–West with 3 lags; bootstrap intervals in 3-month blocks, because the 20-session default is
+  for daily series; verdicts only from 12 scored months.
+
+Deviations and decisions:
+
+- `AgentForecast` carries a `target` column and is unique on (agent, symbol, asOf, horizon, target), because Quant
+  and Risk emit two forecasts each in G2. `NewsHeadline` is unique on (symbol, source id), because one headline is
+  often filed under several symbols. A headline is kept only if Yahoo tags it with the symbol searched.
+- `asOf` is the last session of the latest month whose bars are all in: the stored month counts only when its last
+  `^GSPC` bar is the month's last weekday and that session has closed. The pass refreshes the basket's prices first
+  (they are not synced daily), and deepens any name with less history than 2015.
+- Universe is the basket plus every name in any portfolio, not per portfolio: the pass runs in the cron, outside any
+  user. Bursa names get Risk forecasts only.
+- **Risk (a) was respecified once after seeing test results.** The first version fitted HAR on one non-overlapping
+  sample per month, about 60 per name. Those fits were unstable: forecasts often hit the floor (ORCL, December 2025:
+  8% against a trailing 39%), and it lost to trailing vol on QLIKE, 0.354 against 0.225 (Diebold–Mariano t = −3.1).
+  Daily rows are how Corsi estimates HAR, so the change restores the stated method rather than tuning it; it was
+  made before any live forecast was recorded, and it is the only change.
+
+First read (asOf 2026-09-30, out of sample):
+
+| Agent | Months | Result | Baseline |
+| --- | --- | --- | --- |
+| Technical | 68 (2021-01 to 2026-08), 30 names | Mean IC −0.003, 90% [−0.055, 0.052], t = −0.10; top-minus-bottom third −1.2% a year after costs | 12-1 momentum IC 0.019; difference t = −0.79 |
+| Risk (a) | 79 (2020-02 to 2026-08), 39 names | QLIKE 0.217; gain 0.012, 90% [−0.003, 0.027], DM t = 1.24; MSE 0.68× trailing | Trailing vol QLIKE 0.229 |
+
+Neither has shown skill: the Technical agent ranks no better than chance, and HAR is not distinguishable from
+carrying last month's vol forward on QLIKE, though its squared errors are about a third smaller. The live record starts with
+the 2026-09-30 forecasts (30 Technical, 39 Risk).
 
 ---
 
@@ -421,7 +465,7 @@ F  trade quality (independent; needs only transactions and prices)
 CI (independent)
 ```
 
-A → B → D → G is the research spine. A, B, D, E and CI are done; G1 is next. C and F can be picked up in any gap.
+A → B → D → G is the research spine. A, B, D, E, CI and G1 are done; G2 is next. C and F can be picked up in any gap.
 
 ---
 

@@ -25,6 +25,7 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 - **Risk** — correlation, Garman–Klass vs close-to-close vol, marginal and component risk, historical VaR / expected shortfall with a Kupiec breach test, underwater chart and worst drawdowns
 - **Factors** — Fama–French five-factor plus momentum regression of the US sleeve (USD), Newey–West t-stats, rolling 252-day loadings. Bursa holdings are excluded
 - **Research** — 12-1 cross-sectional momentum on a fixed US large-cap basket or the portfolio's US holdings. Monthly, top third, walk-forward, after commission and slippage, against buy-and-hold, equal weight, and the S&P 500 total return
+- **Agents** — specialist forecasting models scored out of sample (statistical models; no language model produces a number). Technical: cross-sectional ridge on 1/3/6-month returns, 12-1 momentum and distance from the 200-day mean, against plain 12-1 momentum. Risk: per-name HAR forecast of next month's vol, against carrying last month's vol forward. Each has mean IC or QLIKE gain with Newey–West t and a 90% bootstrap range, plus a verdict in words. Every month end the forecasts are recorded before the outcome is known (the live record, never edited). The sync also records headlines forward for a later Sentiment agent
 - **Chart** — compose portfolio, KLCI, S&P 500 TR, a holding, drawdown, and rolling vol/beta on two axes; save the layout in the browser
 - **Holdings** — table + price chart with **avg cost** and **max drawdown** (peak → trough in the selected range); closed lots with realized P&L
 - **Transactions** — symbol search, close-price fill on trade date
@@ -32,7 +33,7 @@ Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` 
 - **Events** — event study around Fed days, CPI releases and earnings: market-model abnormal returns, CAR with a ±2 s.e. band, event-day vs other-day return distributions, an event-only trading rule, and today's ATM straddle versus the median realized move on past events (not a historical IV backtest)
 - **Data** — read-only checks on every stored series behind those pages, worst first: sessions behind and missing against the exchange calendar (from `^GSPC` / `^KLSE`, with index bars on holidays nobody traded dropped), split dates where closes still jump by the split ratio, dividends that go ex on a day with no bar, rows dated on a weekend (a time-zone stamp error), implied-vol gaps, and the latest sync run per trigger with its error
 - Manual **Sync** still exists for a full market pass
-- Daily cron: 6:30am MYT, Tue–Sat (after the US close). It also records the front-month ATM implied vol of every US name (plus SPY) into `ImpliedSnapshot`, because Yahoo serves only today's chain — IV rank on the Events page is built from these rows and stays blank until 20 sessions exist
+- Daily cron: 6:30am MYT, Tue–Sat (after the US close). It also records the front-month ATM implied vol of every US name (plus SPY) into `ImpliedSnapshot`, because Yahoo serves only today's chain — IV rank on the Events page is built from these rows and stays blank until 20 sessions exist. For the same reason it records the day's Yahoo headlines per US name into `NewsHeadline`, and on the first run after a month ends it runs the agents' month-end pass
 - The cron lives in the API process, so it only fires if the API is up at 6:30. On startup the API checks the `SyncRun` table and syncs straight away if nothing has finished since the last US close. Sessions it was down for still have no IV row (the chain is gone), and the Events page lists them. See [Keeping the recorder running](#keeping-the-recorder-running) to sync without the API
 
 ## How numbers work
@@ -68,7 +69,7 @@ Yahoo restates its whole price history when a stock splits. Because a sync only 
 - No FIFO tax lots: realized P&L is weighted average, which is what the holdings table already uses
 - KLCI has no total-return version on Yahoo, so the Bursa leg of the benchmark is still a price index and is understated by roughly its dividend yield
 - Dividends are counted from the ex-date at the gross amount — no withholding tax, no payment-date lag
-- No chart-pattern or discretionary signals. The one tested rule is 12-1 momentum, walk-forward and after costs, and the Research page states when it loses to buy-and-hold
+- No chart-pattern or discretionary signals. The tested rules are 12-1 momentum and the Technical agent, both walk-forward, and their pages state when they show no skill (as of 2026-09 neither does)
 - IV surface is European Black–Scholes on US listed chains (American options ≈ teaching approx)
 - Event dates are best-effort: FOMC is the official Fed calendar, but earnings dates are derived from Yahoo's 10-Q/10-K list (Yahoo does not publish historical announcement dates) and CPI needs a FRED key
 - Scenario shocks are `weight × beta × index + FX sensitivity`, not a model
@@ -119,12 +120,13 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 | GET | `/api/events/study` | `?symbols=` `type=FOMC\|CPI\|EARNINGS` `pre=` `post=` `years=` `hold=` |
 | GET | `/api/events/premium` | `?symbol=` `type=FOMC\|CPI\|EARNINGS` `years=` — today's straddle vs past realized event moves, plus IV rank from recorded snapshots |
 | GET | `/api/research/momentum` | `?universe=holdings\|basket` `portfolioId=` `commissionBps=` `slippageBps=` `short=0\|1` |
+| GET | `/api/research/agents` | Agents page: scoreboard recomputed from stored prices, latest run per agent, recorded live forecasts, headline recording progress |
 | GET | `/api/market/health` | Data page: staleness and missing sessions per series vs the exchange calendar, split cliffs, dividends with no bar, weekend-dated rows, IV recording gaps, latest sync run per trigger |
 | POST | `/api/sync` | Full price + snapshot rebuild |
 
 ## Scripts
 
-**Backend:** `npm run dev` · `npm run test` · `npm run typecheck` · `npm run prisma:migrate` · `npm run prisma:studio` · `npm run events:cpi` · `npm run factors:refresh` · `npm run sync:daily` (add `-- --force` to sync even if one already ran)
+**Backend:** `npm run dev` · `npm run test` · `npm run typecheck` · `npm run prisma:migrate` · `npm run prisma:studio` · `npm run events:cpi` · `npm run factors:refresh` · `npm run sync:daily` (add `-- --force` to sync even if one already ran) · `npm run agents:run` (month-end agent pass; the sync already runs it, and it skips agents that succeeded for the latest complete month)
 
 **Frontend:** `npm run dev` · `npm run build` · `npm run lint`
 
