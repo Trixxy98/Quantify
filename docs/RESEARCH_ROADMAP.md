@@ -35,7 +35,7 @@ Every module below follows the same rules. If a proposed feature cannot satisfy 
 | Data | Splits, dividends, rebase detection | done | `corporateActions.ts`, `market.service.ts` |
 | Data | `^SP500TR` benchmark | done | KLCI stays price-only |
 | Data | Daily ATM implied vol recorder | done | `ImpliedSnapshot`, front month ≥ 20d, SPY always recorded. First row 2026-09-25 |
-| Data | Recorder reliability | done | `SyncRun` table; API syncs on startup if nothing finished since the last US close; `npm run sync:daily` for launchd. Sessions from 2026-09-28 until the first catch-up have no IV row and are listed on Events, not filled |
+| Data | Recorder reliability | done | `SyncRun` table; API syncs on startup if nothing finished since the last US close; `scripts/sync_daily.py` for launchd. Sessions from 2026-09-28 until the first catch-up have no IV row and are listed on Events, not filled |
 | Measurement | TWR with dividend income, realized P&L, closed lots | done | |
 | Risk | Correlation, GK vs C2C vol, MCTR/CCTR, VaR/ES + Kupiec, drawdowns, rolling vol/beta | done | `risk.math.ts`, `risk.service.ts` |
 | Research | Event study (FOMC / CPI / earnings), event-only rule | done | |
@@ -46,7 +46,8 @@ Every module below follows the same rules. If a proposed feature cannot satisfy 
 | Measurement | Block-bootstrap intervals for Sharpe, CAGR, max drawdown, event CAR, momentum Sharpe | done | See Phase D |
 | Research | Agents G1: orchestrator, Technical and Risk (a) agents, scoreboard, live forecast record | done | Agents page. Live record from 2026-09-30. Headlines recorded forward from 2026-10-03 |
 | Tooling | Chart workspace, saved views | done | |
-| Tests | Vitest across metrics, corporate actions, lots, risk math, premium, IV snapshot, OLS, walk-forward, momentum | done | |
+| Tests | pytest across metrics, corporate actions, lots, risk math, premium, IV snapshot, OLS, walk-forward, momentum, agents, plus 166 golden cases from the TS implementation | done | `backend-py/tests` |
+| Platform | API moved from Express + Prisma to FastAPI + SQLAlchemy + Alembic, same database and JSON | done | 2026-10-03; 0 differences on 54 live responses. `backend/` kept one week as the reference. File names in the Built notes below are the TS originals; the Python modules use the same names in snake_case under `backend-py/app/` |
 
 The README *What it is not* section now says there is no chart-pattern signal, and that the one tested rule is 12-1
 momentum, walk-forward, after costs.
@@ -275,20 +276,21 @@ Decision engine   combines forecasts, applies risk limits, resolves conflicts, r
 Agents page       scoreboard, decisions with their reasons, simulated portfolio vs comparators
 ```
 
-No language model produces a number anywhere in this flow. The stack is the existing one: TypeScript models in
-`backend/src/research/`, Postgres via Prisma, the existing `node-cron` job, Express, React. No Python service, task
-queue or Redis (principle 6); five agents over about 40 names run in seconds inside the cron.
+No language model produces a number anywhere in this flow. The stack is the existing one: Python models in
+`backend-py/app/research/agents/` (numpy, statsmodels, scikit-learn), Postgres via SQLAlchemy, the API's APScheduler
+job, FastAPI, React. No separate service, task queue or Redis (principle 6); five agents over about 40 names run in
+seconds inside the cron. (G1 was built in TypeScript and ported unchanged on 2026-10-03.)
 
 **Orchestrator**
 
 - `runAgents(asOf, trigger)` loads the data once, then runs each agent in turn. Each agent is a function from that
   data to forecasts; it does no I/O of its own.
-- Every output is validated with zod before it is used: symbols in the universe, finite values, probabilities in
+- Every output is validated (Pydantic) before it is used: symbols in the universe, finite values, probabilities in
   [0, 1], one row per (agent, symbol, horizon).
 - Each agent run writes an `AgentRun` row (agent, asOf, trigger, started, finished, ok, error, rows, model
   version), the same pattern as `SyncRun`. A failing agent does not stop the others; the decision engine runs on the
   agents that succeeded and the page names the ones that did not.
-- Triggered by the month-end step of the daily cron, and by `npm run agents:run` for a manual pass. Skips if an
+- Triggered by the month-end step of the daily cron, and by `scripts/run_agents.py` for a manual pass. Skips if an
   `AgentRun` for the same `asOf` already succeeded, so a restart does not double-record.
 
 **Common contract**
@@ -384,7 +386,7 @@ decision rules on a synthetic case for each rule, including a skipped conflict a
 1 and give zero to negative-IC agents; forecast and decision rows are append-only.
 
 **Out of scope** Language-model forecasts, deep learning, gradient boosting (no dependency-free implementation worth
-trusting yet), a Python service, task queues, intraday features, parameter sweeps.
+trusting yet), a separate ML service, task queues, intraday features, parameter sweeps.
 
 **Built (G1)** Pure code in `research/agents/`; data loading, the month-end pass and the overview in
 `services/agents.service.ts`; headlines in `services/headlines.service.ts`; Agents page.
@@ -446,7 +448,9 @@ the 2026-09-30 forecasts (30 Technical, 39 Risk).
 | Language-model agents that forecast prices | rejected | No measurable skill, and their training data contains the "future" of any backtest window, so the test leaks. Principles 1 and 2 |
 | Language-model analyst over Phase G | deferred | Only to describe the agents' numbers, never to produce one. Needs an API key and per-call cost |
 | Language-model headline scoring for the Sentiment agent | deferred | Word lists first, because they are testable and free; a local model (Ollama) could be compared against them later on the same recorded headlines |
-| Python ML service, BullMQ + Redis, Fastify, TimescaleDB | rejected for now | One more runtime, a queue and a store for a workload that runs in seconds on ~100k rows. Express and Postgres already cover it (principle 6) |
+| Separate ML service, BullMQ + Redis, TimescaleDB | rejected for now | A second runtime, a queue and a store for a workload that runs in seconds on ~100k rows. The API itself moved to Python (FastAPI) on 2026-10-03, so models live in it directly (principle 6) |
+| Fix `latestSession` DST offset | recommended | Applies today's UTC offset to the session day, so the close is an hour off across a DST change. Ported bug for bug for parity; fix, with a test on the March and November weekends |
+| Fix the covariance matrix behind risk shares | recommended | `sample_covariance_matrix` fills only the upper triangle (the TS original wrote `cov[i][j]` twice). Risk shares and the correlation matrix read zeros below the diagonal. Ported bug for bug; fix and re-check the Risk page |
 | Gradient-boosted agents | deferred | After G, if a linear agent shows skill worth trying to improve |
 
 ---
@@ -471,8 +475,13 @@ A → B → D → G is the research spine. A, B, D, E, CI and G1 are done; G2 is
 
 ## 6. Conventions for new modules
 
-- Pure math in `backend/src/services/*.math.ts` or `backend/src/research/*.ts`, no Prisma imports, unit tested.
-- Service wraps math with data loading; controller validates with zod; route is `GET`, auth required.
+- Pure math in `backend-py/app/services/*_math.py` or `backend-py/app/research/`, no database imports, unit tested
+  with pytest.
+- Service wraps math with data loading (SQLAlchemy session passed in); router validates with Pydantic; route is
+  `GET`, auth required (`UserId` dependency). Responses are plain dicts with camelCase keys, serialised the way the
+  Node API did (`NodeRoute`).
+- Schema changes: edit `app/models.py`, `uv run alembic revision --autogenerate`, read the generated file, keep only
+  the intended change.
 - Frontend: one hook per endpoint (`useX.ts`), types in `api.types.ts`, page composed from small components under
   `components/<area>/`.
 - Every response payload carries `n`, a `notes: string[]` array for caveats, and where relevant `dataThrough`.
@@ -486,6 +495,6 @@ A → B → D → G is the research spine. A, B, D, E, CI and G1 are done; G2 is
 1. **Phase B universe.** Resolved: both, selectable. The basket is `momentumBasket.json`, dated 2026-01-01. Holdings
    with fewer than three US names are reported as not a cross-sectional test.
 2. **Phase A refresh.** Resolved: the cron refreshes when the stored tail is older than 7 days, and
-   `npm run factors:refresh` forces a download. The page states the data-through date.
+   `scripts/refresh_factors.py` forces a download. The page states the data-through date.
 3. **Where Research lives in the nav.** New top-level page, or a tab inside Events? Default: new page, since the
    Events page is already long.

@@ -11,10 +11,13 @@ You enter BUY/SELL trades. Quantify rebuilds holdings, pulls Yahoo Finance price
 | Layer | Tech |
 | --- | --- |
 | App | React 19, Vite, Tailwind CSS v4, TanStack Query, Zustand, Recharts |
-| API | Node.js, Express, Prisma, PostgreSQL 16 |
-| Market data | [yahoo-finance2](https://github.com/gadicc/node-yahoo-finance2) (`DailyPrice`, FX `MYR=X`, `^KLSE`, `^GSPC`) |
+| API | Python 3.13, FastAPI, SQLAlchemy 2, Alembic, PostgreSQL 16 |
+| Numerics | numpy, pandas, scipy, statsmodels (Newey–West OLS), scikit-learn (ridge) |
+| Market data | Yahoo Finance through [yfinance](https://github.com/ranaroussi/yfinance)'s data client (`DailyPrice`, FX `MYR=X`, `^KLSE`, `^GSPC`, `^SP500TR`, option chains, headlines) |
 
-Repo layout: `frontend/` and `backend/`. Postgres runs in Docker (`quantify-db` on `127.0.0.1:5434`).
+Repo layout: `frontend/` and `backend-py/`. Postgres runs in Docker (`quantify-db` on `127.0.0.1:5434`).
+
+`backend/` is the original Express + Prisma API. The Python API replaced it on 2026-10-03, after every endpoint returned the same JSON on the same database (see [Migration to Python](#migration-to-python)). It stays in the repo only as the reference for a week of parallel checks, and is then deleted.
 
 ## What it does
 
@@ -78,7 +81,7 @@ Yahoo restates its whole price history when a stock splits. Because a sync only 
 
 ## Setup
 
-**Need:** Docker, Node 20+ (yahoo-finance2 prefers Node 22), two terminals.
+**Need:** Docker, [uv](https://docs.astral.sh/uv/) (it installs Python 3.13 itself), Node 20+ for the frontend, two terminals.
 
 ```bash
 # 1. Postgres
@@ -86,14 +89,14 @@ cp .env.example .env
 docker compose up -d
 
 # 2. API
-cd backend
+cd backend-py
 cp .env.example .env
 # Set JWT_ACCESS_SECRET and JWT_REFRESH_SECRET to ≥32 characters
-npm install
-npx prisma migrate dev
-npm run prisma:seed   # optional: extra sample trades for SEED_EMAIL (default demo@quantify.local; register it first)
-npm run dev
+uv sync
+uv run alembic upgrade head    # empty database: creates the schema
+uv run python -m app --reload
 # http://localhost:4000  —  GET /health
+SEED_EMAIL=you@example.com uv run python scripts/seed.py   # optional sample trades; register that account first
 
 # 3. App
 cd frontend
@@ -103,11 +106,15 @@ npm run dev
 # http://localhost:5173
 ```
 
-Root `.env` is for Compose (`POSTGRES_*`). `backend/.env` `DATABASE_URL` must match that user/password/db/port (`5434` by default). Frontend `VITE_API_URL=http://localhost:4000/api`.
+Root `.env` is for Compose (`POSTGRES_*`). `backend-py/.env` `DATABASE_URL` must match that user/password/db/port (`5434` by default). Frontend `VITE_API_URL=http://localhost:4000/api`.
+
+A database first built by Prisma is adopted with `uv run alembic stamp head` (it runs no DDL). From then on schema changes go through Alembic only: `uv run alembic revision --autogenerate -m "..."`, read the file, then `uv run alembic upgrade head`. Alembic keeps its version table in its own `alembic` schema.
+
+`SCHEDULER_ENABLED=true` runs the daily sync and the startup catch-up inside the API. Only one process may have it on.
 
 Optional: `RISK_FREE_RATE` on the API (default `0.03`) for Sharpe/alpha and the IV surface.
 
-Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to load CPI release dates for the Events page — BLS blocks automated fetches of its own schedule, so run `npm run events:cpi` once and the dates are written into `src/data/macroEvents.json`. Fed days ship with the repo and need no key.
+Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to load CPI release dates for the Events page — BLS blocks automated fetches of its own schedule, so run `uv run python scripts/fetch_cpi_dates.py` once and the dates are written into `app/data/macroEvents.json`. Fed days ship with the repo and need no key.
 
 ## API (auth required except `/health` and `/api/auth/*`)
 
@@ -128,15 +135,29 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 
 ## Scripts
 
-**Backend:** `npm run dev` · `npm run test` · `npm run typecheck` · `npm run prisma:migrate` · `npm run prisma:studio` · `npm run events:cpi` · `npm run factors:refresh` · `npm run sync:daily` (add `-- --force` to sync even if one already ran) · `npm run agents:run` (month-end agent pass; the sync already runs it, and it skips agents that succeeded for the latest complete month)
+**API** (in `backend-py/`, each prefixed with `uv run`):
+
+| Command | What it does |
+| --- | --- |
+| `python -m app [--reload]` | Serve on `API_PORT` |
+| `pytest -m "not contract"` | Unit tests and golden fixtures; pure, no database |
+| `pytest -m contract` | Live checks against the Node API (needs it running and `QUANTIFY_EMAIL`) |
+| `ruff check .` · `mypy app` | Lint, types |
+| `alembic upgrade head` · `alembic revision --autogenerate -m "..."` | Migrations |
+| `python scripts/sync_daily.py [--force]` | The cron's pass without the API |
+| `python scripts/run_agents.py` | Month-end agent pass (the sync already runs it; skips agents that succeeded for the latest complete month) |
+| `python scripts/refresh_factors.py` | Re-download the Ken French factors |
+| `python scripts/fetch_cpi_dates.py` | CPI release dates from FRED |
+| `python scripts/seed.py` | Sample trades for `SEED_EMAIL` |
+| `python scripts/compare_bars.py` | Read-only check that a fresh Yahoo pull matches the stored bars |
 
 **Frontend:** `npm run dev` · `npm run build` · `npm run lint`
 
-**CI:** `.github/workflows/ci.yml` runs backend typecheck and tests, and frontend typecheck and lint, on pushes to `main` / `dev` and on pull requests. The tests are pure and need no database.
+**CI:** `.github/workflows/ci.yml` runs the Python API's lint, types and tests, and frontend typecheck and lint, on pushes to `main` / `dev` and on pull requests. The tests are pure and need no database. The Node job stays until `backend/` is deleted.
 
 ### Keeping the recorder running
 
-`npm run sync:daily` does the same pass as the cron without the API. It skips when a sync has already finished after the last US close, or when another process is mid-sync, so it is safe alongside the API's own job. On a Mac, save this as `~/Library/LaunchAgents/com.quantify.sync.plist` (fix the path) and run `launchctl load` on it. It fires at 07:00 local time, and launchd runs a missed job when the Mac wakes. Postgres must be up.
+`uv run python scripts/sync_daily.py` does the same pass as the cron without the API. It skips when a sync has already finished after the last US close, or when another process is mid-sync, so it is safe alongside the API's own job. On a Mac, save this as `~/Library/LaunchAgents/com.quantify.sync.plist` (fix the path) and run `launchctl load` on it. It fires at 07:00 local time, and launchd runs a missed job when the Mac wakes. Postgres must be up.
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -147,7 +168,7 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
   <key>ProgramArguments</key>
   <array>
     <string>/bin/zsh</string><string>-lc</string>
-    <string>cd /path/to/Stocks-portfolio/backend &amp;&amp; npm run sync:daily</string>
+    <string>cd /path/to/Stocks-portfolio/backend-py &amp;&amp; ~/.local/bin/uv run python scripts/sync_daily.py</string>
   </array>
   <key>StartCalendarInterval</key><dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
   <key>StandardOutPath</key><string>/tmp/quantify-sync.log</string>
@@ -158,9 +179,18 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 
 ## Notes
 
-- Upgrading an existing database: run `npm run prisma:migrate`, then one **Sync**. Splits, dividends and `^SP500TR` are empty until that pass, so dividends read as zero and the chart falls back to the S&P price index.
+- A new database has no splits, dividends or `^SP500TR` until the first **Sync**, so dividends read as zero and the chart falls back to the S&P price index.
 - USD/MYR bars are dated by the London day, because Yahoo stamps them at London midnight (23:00 UTC in summer). A database synced before this fix has FX rows a day early; the next sync sees the weekend-dated rows and rewrites the stored FX range once.
 - First save of a **new** ticker waits on Yahoo; editing qty on a known name is mostly a snapshot rebuild.
 - Charts and metrics need price history. If a range is empty, Sync or pick a longer range.
 - Refresh tokens live in client storage (fine for local use, not a production auth story).
 - `POST /api/sync` is any logged-in user — there is no admin role.
+
+## Migration to Python
+
+The API moved from Express + Prisma to FastAPI + SQLAlchemy on 2026-10-03, on the same database and with the same JSON contract, so the frontend did not change. Every module was ported against the Node API, not rewritten from its description:
+
+- **Golden fixtures.** `backend/scripts/exportFixtures.ts` ran the TS pure functions on fixed inputs and wrote 166 cases to `backend-py/tests/fixtures/`. The Python ports match them to 1e-9 for plain math and 1e-6 where statsmodels (Newey–West OLS), scikit-learn (ridge) or scipy (`brentq` for implied vol) replaced hand-written solvers. The seeded Mulberry32 bootstrap is reproduced bit for bit, so intervals did not move.
+- **Live contract diff.** `tests/contract/diff.py` called every GET endpoint on both APIs with the same token: 54 responses across two real users, 0 differences. The write paths (create, edit, delete, over-sell, validation errors) were run through both on a throwaway user, with identical holdings, snapshots and metrics afterwards. Tokens and password hashes work across both.
+- **Market data.** `scripts/compare_bars.py` checked that the Python Yahoo client returns exactly the stored OHLC, volume, splits and dividends for all 43 series over 400 days.
+- **Kept on purpose, bug for bug:** `latestSession` applies today's UTC offset to the session day (an hour off across a DST change), and the covariance matrix behind risk shares fills only its upper triangle. Both are listed under recommendations in `docs/RESEARCH_ROADMAP.md` rather than fixed during the port.
