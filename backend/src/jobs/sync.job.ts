@@ -4,6 +4,8 @@ import {getTrackedSymbols, syncMarketData} from "../services/market.service";
 import {rebuildAllSnapshots} from "../services/snapshot.service";
 import {captureImpliedSnapshots} from "../services/impliedSnapshot.service";
 import {refreshFactorsIfStale} from "../services/factors.service";
+import {recordHeadlines} from "../services/headlines.service";
+import {agentUniverse, runAgents} from "../services/agents.service";
 import {AppError} from "../utils/AppError";
 import {latestUsSessionClose} from "./marketSession";
 
@@ -34,9 +36,16 @@ export async function runFullSync(daysBack = MAX_DAYS_BACK, trigger: SyncTrigger
         // only chance to record it. Upserts by session, so a manual sync
         // during US hours is overwritten by the closing marks next morning.
         const implied = await captureImpliedSnapshots(await getTrackedSymbols());
+        // Same reason as the IV rows: Yahoo serves today's headlines only.
+        const headlines = await recordHeadlines(await agentUniverse());
         const factors = await refreshFactorsIfStale();
         await prisma.syncRun.update({where: {id: run.id}, data: {finishedAt: new Date(), ok: true}});
-        return {...market, portfolios, impliedSnapshots: implied.recorded, factorsThrough: factors.through};
+        // Month-end step. Does nothing until a new month completes; its failure is logged, not the sync's.
+        const agents = await runAgents(trigger).catch((err) => {
+            console.error("[agents] month-end pass failed", err);
+            return {ran: false as const, asOf: null, reason: err instanceof Error ? err.message : String(err)};
+        });
+        return {...market, portfolios, impliedSnapshots: implied.recorded, headlines: headlines.recorded, factorsThrough: factors.through, agents};
     } catch (err) {
         await prisma.syncRun
             .update({

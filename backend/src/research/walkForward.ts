@@ -24,6 +24,20 @@ export function walkForwardFolds(n: number, train: number, test: number, step: n
     return folds;
 }
 
+/**
+ * Expanding train window from 0, refit every `step` observations. Unlike the
+ * rolling version the last fold is kept even when it is short, so the newest
+ * observations are always forecast by the newest fit.
+ */
+export function expandingFolds(n: number, minTrain: number, step: number): Fold[] {
+    if (minTrain < 1 || step < 1) throw new Error("walk-forward windows must be positive");
+    const folds: Fold[] = [];
+    for (let trainEnd = minTrain; trainEnd < n; trainEnd += step) {
+        folds.push({trainStart: 0, trainEnd, testStart: trainEnd, testEnd: Math.min(trainEnd + step, n)});
+    }
+    return folds;
+}
+
 export type WalkForwardFold<P> = Fold & {params: P};
 
 /**

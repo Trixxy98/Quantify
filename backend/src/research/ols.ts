@@ -104,7 +104,7 @@ function multiplyMatrices(a: number[][], b: number[][]): number[][] {
     );
 }
 
-function invert(matrix: number[][]): number[][] {
+export function invert(matrix: number[][]): number[][] {
     const n = matrix.length;
     const a = matrix.map((row, i) => {
         const extended = [...row];

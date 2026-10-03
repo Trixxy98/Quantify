@@ -1,6 +1,7 @@
 import {Request, Response} from "express";
 import {z} from "zod";
 import {getMomentumStudy} from "../services/momentum.service";
+import {getAgentsOverview} from "../services/agents.service";
 import {AppError} from "../utils/AppError";
 
 const momentumQuerySchema = z.object({
@@ -10,6 +11,10 @@ const momentumQuerySchema = z.object({
     slippageBps: z.coerce.number().min(0).max(100).default(5),
     short: z.enum(["0", "1"]).default("0"),
 });
+
+export async function getAgentsHandler(_req: Request, res: Response) {
+    res.json(await getAgentsOverview());
+}
 
 export async function getMomentumHandler(req: Request, res: Response) {
     const parsed = momentumQuerySchema.safeParse(req.query);

@@ -96,7 +96,7 @@ async function ensureHistory(symbols: string[]): Promise<string[]> {
     return failed;
 }
 
-function buildLevel(
+export function buildLevel(
     closes: {date: string; close: number}[],
     dividends: {date: string; amount: number}[]
 ): {date: string; level: number}[] {

@@ -526,3 +526,64 @@ export type DataHealth = {
     rows: DataHealthRow[];
     notes: string[];
 };
+
+export type AgentName = "technical" | "risk";
+
+export type AgentRunView = {
+    agent: AgentName;
+    asOf: string;
+    trigger: string;
+    modelVersion: string;
+    startedAt: string;
+    finishedAt: string | null;
+    ok: boolean;
+    error: string | null;
+    rows: number;
+};
+
+export type AgentScore = {
+    agent: AgentName;
+    version: string;
+    target: "returnScore" | "vol";
+    horizon: "1m";
+    metric: string;
+    months: number;
+    avgNames: number | null;
+    from: string | null;
+    to: string | null;
+    value: number | null;
+    se: number | null;
+    tStat: number | null;
+    interval: BootstrapInterval | null;
+    baseline: {label: string; value: number | null; difference: number | null; tStat: number | null};
+    extras: {label: string; value: number | null; format: "number" | "pct"}[];
+    verdict: string;
+};
+
+export type RecordedForecasts = {
+    agent: AgentName;
+    asOf: string | null;
+    recordedAt: string | null;
+    liveMonths: number;
+    rows: {symbol: string; value: number}[];
+};
+
+export type AgentsOverview = {
+    asOf: string | null;
+    universe: {symbols: number; us: number; bursa: number; basket: number; basketAsOf: string};
+    agents: {
+        name: AgentName;
+        label: string;
+        description: string;
+        version: string;
+        target: string;
+        horizon: string;
+        error: string | null;
+        notes: string[];
+    }[];
+    runs: AgentRunView[];
+    scoreboard: AgentScore[];
+    recorded: RecordedForecasts[];
+    headlines: {total: number; symbols: number; since: string | null; latest: string | null};
+    notes: string[];
+};
