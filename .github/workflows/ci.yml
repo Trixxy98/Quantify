@@ -28,6 +28,26 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
+  backend-py:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-py
+    # Unit tests are pure; the contract diff needs both servers and is not run here.
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      JWT_ACCESS_SECRET: ci-access-secret-ci-access-secret-0000
+      JWT_REFRESH_SECRET: ci-refresh-secret-ci-refresh-secret-000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run mypy app
+      - run: uv run pytest -m "not contract"
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
