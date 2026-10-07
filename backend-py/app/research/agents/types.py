@@ -2,9 +2,9 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
-AgentName = Literal["technical", "risk"]
-AgentTarget = Literal["returnScore", "vol"]
-AgentHorizon = Literal["1m"]
+AgentName = Literal["technical", "risk", "quant", "event"]
+AgentTarget = Literal["returnScore", "vol", "probBeatMedian", "volUplift", "probDrawdown"]
+AgentHorizon = Literal["1m", "5d"]
 
 
 @dataclass
@@ -25,6 +25,8 @@ class SymbolSeries:
 class AgentInput:
     as_of: str  # last session of the latest complete month; nothing after it is in `series`
     series: list[SymbolSeries]
+    factors: dict[str, dict[str, float]] | None = None
+    events: list[dict] | None = None
 
 
 @dataclass
