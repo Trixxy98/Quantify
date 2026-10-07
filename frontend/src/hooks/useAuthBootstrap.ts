@@ -1,11 +1,10 @@
 import {useEffect, useState} from "react";
-import {apiClient} from "../api/client";
+import {refreshSession} from "../api/client";
 import {useAuthStore} from "../store/auth.store";
 
 export function useAuthBootstrap(): boolean {
     const [isReady, setIsReady] = useState(false);
     const refreshToken = useAuthStore((state) => state.refreshToken);
-    const setTokens = useAuthStore((state) => state.setTokens);
     const logout = useAuthStore((state) => state.logout);
 
     useEffect(() => {
@@ -16,10 +15,13 @@ export function useAuthBootstrap(): boolean {
             }
 
             try {
-                const {data} = await apiClient.post("/auth/refresh", {refreshToken});
-                setTokens(data.accessToken, data.refreshToken);
+                // Shared with the 401 interceptor: StrictMode runs this effect twice, and a second
+                // refresh with the same single-use token would be rejected and log the user out.
+                await refreshSession(refreshToken);
             } catch {
-                logout();
+                if (useAuthStore.getState().refreshToken === refreshToken) {
+                    logout();
+                }
             } finally {
                 setIsReady(true);
             }

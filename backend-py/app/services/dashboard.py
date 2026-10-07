@@ -306,7 +306,7 @@ def get_performance(db: Session, portfolio_id: str, user_id: str, range_: str) -
     base = portfolio.base_currency.value
     rows = load_snapshots(db, portfolio_id, range_)
     if not rows:
-        return {"range": range_, "series": [], "benchmarkSeries": [], "klciSeries": [], "spxSeries": []}
+        return {"range": range_, "series": [], "benchmarkSeries": [], "klciSeries": [], "spxSeries": [], "usBenchmark": resolve_us_benchmark(db)}
     nav = _nav(rows)
     weights = get_benchmark_weights(db, portfolio_id, base)
     us_benchmark = resolve_us_benchmark(db)

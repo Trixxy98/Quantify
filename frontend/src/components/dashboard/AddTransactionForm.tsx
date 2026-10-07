@@ -73,6 +73,8 @@ export function AddTransactionForm({portfolioId, editing = null, onCancelEdit}: 
             }
             await queryClient.invalidateQueries({queryKey: ["portfolio", portfolioId]});
             await queryClient.invalidateQueries({queryKey: ["portfolios"]});
+            await queryClient.invalidateQueries({queryKey: ["research"]});
+            await queryClient.invalidateQueries({queryKey: ["market", "health"]});
         },
         onError: (err) => {
             setSuccess(null);

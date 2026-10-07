@@ -20,6 +20,8 @@ export function TransactionsTable({ portfolioId, editingId, onEdit }: Props) {
     mutationFn: (transactionId: string) => deleteTransaction(portfolioId, transactionId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
+      await queryClient.invalidateQueries({ queryKey: ["research"] });
+      await queryClient.invalidateQueries({ queryKey: ["market", "health"] });
     },
   });
 

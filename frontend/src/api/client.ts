@@ -28,6 +28,16 @@ async function refreshAccessToken(sessionToken: string): Promise<string> {
     return data.accessToken;
 }
 
+// Refresh tokens are single-use, so every caller shares one in-flight refresh.
+export function refreshSession(sessionToken: string): Promise<string> {
+    if (!refreshPromise) {
+      refreshPromise = refreshAccessToken(sessionToken).finally(() => {
+        refreshPromise = null;
+      });
+    }
+    return refreshPromise;
+}
+
 apiClient.interceptors.response.use(
     (response) => response,
     async (error: AxiosError) => {
@@ -46,12 +56,7 @@ apiClient.interceptors.response.use(
       }
   
       try {
-        if (!refreshPromise) {
-          refreshPromise = refreshAccessToken(sessionToken).finally(() => {
-            refreshPromise = null;
-          });
-        }
-        const newAccessToken = await refreshPromise;
+        const newAccessToken = await refreshSession(sessionToken);
   
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
