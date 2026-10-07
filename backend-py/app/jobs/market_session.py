@@ -33,10 +33,9 @@ def latest_session(now: datetime, market: Market) -> Session:
         day -= timedelta(days=1)
         while day.weekday() >= 5:
             day -= timedelta(days=1)
-    # Today's UTC offset is applied to the session day, as the Node API does; across a DST change the close is an hour off.
-    now_utc = aware.astimezone(UTC).replace(tzinfo=None, second=0, microsecond=0)
-    offset = local.replace(tzinfo=None, second=0, microsecond=0) - now_utc
-    close = datetime(day.year, day.month, day.day) + timedelta(minutes=close_minutes) - offset
+    # Offset for the session day itself (not "now"), so a weekend that spans a DST change stays correct.
+    close_local = datetime(day.year, day.month, day.day, close_minutes // 60, close_minutes % 60, tzinfo=zone)
+    close = close_local.astimezone(UTC).replace(tzinfo=None)
     return Session(close=close, date=day.isoformat())
 
 

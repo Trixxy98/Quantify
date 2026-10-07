@@ -12,12 +12,13 @@ from sqlalchemy.orm import Session
 from app.db import SessionLocal
 from app.jobs.market_session import latest_session
 from app.jobs.state import finish_agents, try_start_agents
-from app.models import AgentForecast, AgentRun, BenchmarkPrice, DailyPrice, NewsHeadline, new_id, table_of
+from app.models import AgentForecast, AgentRun, BenchmarkPrice, DailyPrice, FactorReturn, NewsHeadline, new_id, table_of
 from app.research.agents.orchestrator import AGENTS, AgentRunState, agents_due, completed_month_end, run_agent_set
 from app.research.agents.scoreboard import score_agent
 from app.research.agents.technical import MIN_TRAIN_MONTHS
 from app.research.agents.types import AgentInput, SymbolSeries
 from app.services.corporate_actions import load_dividends
+from app.services.events import load_macro
 from app.services.market import get_tracked_symbols, sync_daily_prices
 from app.services.momentum import build_level
 from app.timeutil import date_key, iso, utcnow
@@ -28,22 +29,32 @@ HISTORY_FROM = datetime(2015, 1, 1)
 # A run unfinished after this long is assumed dead, as for SyncRun.
 AGENT_IN_FLIGHT = timedelta(hours=1)
 REFRESH_WORKERS = 3
+INDEX_VIEW_SYMBOLS = ("SPY",)
 
 AGENT_INFO = {
     "technical": {
         "label": "Technical",
         "description": "Ranks next month's US returns from 1, 3 and 6-month returns, 12-1 momentum and distance from the 200-day mean.",
     },
+    "quant": {
+        "label": "Quant",
+        "description": "FF5+Mom loadings × trailing factor premia: return rank and P(beat the cross-sectional median). Includes SPY.",
+    },
+    "event": {
+        "label": "Event",
+        "description": "Mean past abnormal move for FOMC/CPI/earnings types scheduled in the next month (return rank and vol uplift).",
+    },
     "risk": {
         "label": "Risk",
-        "description": "Forecasts next month's realized vol for every name, US and Bursa, from the last day, week and month of Garman–Klass variance.",
+        "description": "HAR next-month vol per name, plus P(market drawdown ≤ −5% peak-to-trough) on SPY/^GSPC.",
     },
 }
 
 
 def agent_universe(db: Session) -> list[str]:
-    """The dated basket plus every name held or traded in any portfolio."""
-    return sorted(symbol for symbol in {*BASKET["symbols"], *get_tracked_symbols(db)} if not symbol.startswith("^"))
+    """Basket + every traded name + SPY for the index view."""
+    symbols = {*BASKET["symbols"], *get_tracked_symbols(db), *INDEX_VIEW_SYMBOLS}
+    return sorted(symbol for symbol in symbols if not symbol.startswith("^"))
 
 
 def _us_calendar(db: Session) -> list[str]:
@@ -130,10 +141,35 @@ def load_agent_input(db: Session, as_of: str, symbols: list[str]) -> AgentInput:
                 level=[point["level"] for point in build_level([{"date": d, "close": c} for d, c in zip(dates, close, strict=True)], income)],
             )
         )
-    return AgentInput(as_of=as_of, series=series)
+    return AgentInput(as_of=as_of, series=series, factors=_load_factors(db, as_of), events=_load_macro_events())
+
+
+def _load_factors(db: Session, as_of: str) -> dict[str, dict[str, float]]:
+    rows = db.execute(
+        select(FactorReturn.date, FactorReturn.factor, FactorReturn.value).where(
+            FactorReturn.date >= HISTORY_FROM.date(),
+            FactorReturn.date <= date.fromisoformat(as_of),
+        )
+    ).all()
+    out: dict[str, dict[str, float]] = {}
+    for row in rows:
+        out.setdefault(date_key(row.date), {})[row.factor] = float(row.value)
+    return out
+
+
+def _load_macro_events() -> list[dict[str, Any]]:
+    # File only — no Yahoo on the scoreboard path. Earnings can be added later on the month-end pass.
+    data = load_macro()
+    events: list[dict[str, Any]] = []
+    for day in data.get("fomc", []):
+        events.append({"date": day, "type": "FOMC", "symbol": None})
+    for day in data.get("cpi", []):
+        events.append({"date": day, "type": "CPI", "symbol": None})
+    return events
 
 
 def run_agents(trigger: str, now: datetime | None = None) -> dict[str, Any]:
+
     """
     Month-end pass: every agent without a success for the latest complete month
     runs once and its forecasts for that month are recorded. Safe to call daily.
@@ -148,7 +184,7 @@ def run_agents(trigger: str, now: datetime | None = None) -> dict[str, Any]:
                 return {"ran": False, "asOf": None, "reason": "no complete month in the ^GSPC calendar"}
             as_of_date = date.fromisoformat(as_of)
             previous = [
-                AgentRunState(run.agent, run.ok, run.started_at, run.finished_at)
+                AgentRunState(run.agent, run.model_version, run.ok, run.started_at, run.finished_at)
                 for run in db.scalars(select(AgentRun).where(AgentRun.as_of == as_of_date)).all()
             ]
             due = agents_due(AGENTS, previous, now, AGENT_IN_FLIGHT)
@@ -221,14 +257,36 @@ def _run_view(run: AgentRun) -> dict[str, Any]:
     }
 
 
-def _recorded_forecasts(db: Session, agent: str) -> dict[str, Any]:
-    latest = db.scalar(select(func.max(AgentForecast.as_of)).where(AgentForecast.agent == agent))
+def _recorded_forecasts(db: Session, agent: str, target: str, horizon: str) -> dict[str, Any]:
+    latest = db.scalar(
+        select(func.max(AgentForecast.as_of)).where(
+            AgentForecast.agent == agent, AgentForecast.target == target, AgentForecast.horizon == horizon
+        )
+    )
     if latest is None:
-        return {"agent": agent, "asOf": None, "recordedAt": None, "liveMonths": 0, "rows": []}
-    rows = db.scalars(select(AgentForecast).where(AgentForecast.agent == agent, AgentForecast.as_of == latest).order_by(AgentForecast.value.desc())).all()
-    months = db.scalar(select(func.count(func.distinct(AgentForecast.as_of))).where(AgentForecast.agent == agent)) or 0
+        return {"agent": agent, "target": target, "horizon": horizon, "asOf": None, "recordedAt": None, "liveMonths": 0, "rows": []}
+    rows = db.scalars(
+        select(AgentForecast)
+        .where(
+            AgentForecast.agent == agent,
+            AgentForecast.target == target,
+            AgentForecast.horizon == horizon,
+            AgentForecast.as_of == latest,
+        )
+        .order_by(AgentForecast.value.desc())
+    ).all()
+    months = (
+        db.scalar(
+            select(func.count(func.distinct(AgentForecast.as_of))).where(
+                AgentForecast.agent == agent, AgentForecast.target == target, AgentForecast.horizon == horizon
+            )
+        )
+        or 0
+    )
     return {
         "agent": agent,
+        "target": target,
+        "horizon": horizon,
         "asOf": date_key(latest),
         "recordedAt": iso(rows[0].created_at) if rows else None,
         "liveMonths": months,
@@ -250,13 +308,22 @@ def get_agents_overview(db: Session, now: datetime | None = None) -> dict[str, A
     symbols = agent_universe(db)
     data = load_agent_input(db, as_of, symbols) if as_of else None
     results = run_agent_set(AGENTS, data) if data else []
-    latest_runs = [db.scalars(select(AgentRun).where(AgentRun.agent == agent.name).order_by(AgentRun.started_at.desc()).limit(1)).first() for agent in AGENTS]
+    latest_runs = [
+        db.scalars(
+            select(AgentRun)
+            .where(AgentRun.agent == agent.name, AgentRun.model_version == agent.version)
+            .order_by(AgentRun.started_at.desc())
+            .limit(1)
+        ).first()
+        for agent in AGENTS
+    ]
 
     notes = [
-        f"Universe: the {len(BASKET['symbols'])}-name basket dated {BASKET['asOf']} plus every name in any portfolio. Return-rank agents use the US names only; Bursa names have no factor data and too few peers for a cross-section.",
+        f"Universe: the {len(BASKET['symbols'])}-name basket dated {BASKET['asOf']} plus every name in any portfolio, plus SPY for the index view. Return-rank agents use the US names only; Bursa names have no factor data and too few peers for a cross-section.",
         f"Everything here is out of sample: each month is forecast by a model fitted only on months whose outcome was known beforehand, starting after {MIN_TRAIN_MONTHS} months of training.",
         "With about 70 test months, a mean IC needs to be roughly 0.035 or more to clear t = 2. Monthly t-stats use Newey–West (3 lags); intervals are the 5th–95th percentile of 2,000 stationary bootstrap resamples in 3-month blocks.",
         "The scoreboard is a backtest recomputed from stored prices. Recorded forecasts are the live record, written at each month end before the outcome is known, and are never edited.",
+        "G2 adds Quant, Event and Risk drawdown probability. Macro event dates come from macroEvents.json (no Yahoo on the scoreboard). Five-session horizon helpers live in research/agents/horizon.py; 5d agent entries can be added next.",
         "Headlines are recorded forward for the Sentiment agent (G3). It gets no weight until 12 scored months exist.",
     ]
     if data:
@@ -267,7 +334,7 @@ def get_agents_overview(db: Session, now: datetime | None = None) -> dict[str, A
 
     agents = []
     for agent in AGENTS:
-        result = next((row for row in results if row.agent == agent.name), None)
+        result = next((row for row in results if row.version == agent.version), None)
         agents.append(
             {
                 "name": agent.name,
@@ -291,7 +358,7 @@ def get_agents_overview(db: Session, now: datetime | None = None) -> dict[str, A
         "agents": agents,
         "runs": [_run_view(run) for run in latest_runs if run is not None],
         "scoreboard": [score_agent(result.output) for result in results if result.ok and result.output],
-        "recorded": [_recorded_forecasts(db, agent.name) for agent in AGENTS],
+        "recorded": [_recorded_forecasts(db, agent.name, agent.target, agent.horizon) for agent in AGENTS],
         "headlines": _headline_progress(db),
         "notes": notes,
     }

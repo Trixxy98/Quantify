@@ -4,11 +4,23 @@ from datetime import date, datetime, timedelta
 
 from pydantic import BaseModel, ValidationError, ValidationInfo, field_validator, model_validator
 
+from app.research.agents.event import event_agent, event_vol_agent
+from app.research.agents.quant import quant_agent, quant_prob_agent
+from app.research.agents.risk_drawdown import risk_drawdown_agent
 from app.research.agents.risk_vol import risk_vol_agent
 from app.research.agents.technical import technical_agent
 from app.research.agents.types import Agent, AgentInput, AgentOutput, AgentPrediction
 
-AGENTS: list[Agent] = [technical_agent, risk_vol_agent]
+# One entry per (name, target, horizon). Due-key is (name, model_version).
+AGENTS: list[Agent] = [
+    technical_agent,
+    quant_agent,
+    quant_prob_agent,
+    event_agent,
+    event_vol_agent,
+    risk_vol_agent,
+    risk_drawdown_agent,
+]
 
 
 class _Prediction(BaseModel):
@@ -72,6 +84,8 @@ class _Output(BaseModel):
                 raise ValueError(f"{where}: {row.symbol} {row.month} has an outcome that cannot be known yet")
             if agent.target == "vol" and not row.forecast > 0:
                 raise ValueError(f"{where}: {row.symbol} {row.month} vol forecast is not positive")
+            if agent.target in ("probBeatMedian", "probDrawdown") and not 0.0 <= row.forecast <= 1.0:
+                raise ValueError(f"{where}: {row.symbol} {row.month} probability is outside [0, 1]")
             key = f"{row.month}|{row.symbol}"
             if key in seen:
                 raise ValueError(f"{where}: duplicate forecast for {row.symbol} {row.month}")
@@ -140,16 +154,17 @@ def completed_month_end(calendar: list[str], latest_closed_session: str) -> str 
 @dataclass
 class AgentRunState:
     agent: str
+    model_version: str
     ok: bool
     started_at: datetime
     finished_at: datetime | None
 
 
 def agents_due(agents: list[Agent], runs: list[AgentRunState], now: datetime, in_flight: timedelta) -> list[Agent]:
-    """Agents without a successful run for this asOf, and not being run right now by another process."""
+    """Due if this (agent name, model version) has no success for asOf and is not in flight."""
     due = []
     for agent in agents:
-        mine = [run for run in runs if run.agent == agent.name]
+        mine = [run for run in runs if run.agent == agent.name and run.model_version == agent.version]
         if any(run.ok for run in mine):
             continue
         if any(run.finished_at is None and now - run.started_at < in_flight for run in mine):

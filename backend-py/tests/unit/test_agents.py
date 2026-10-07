@@ -232,15 +232,20 @@ class TestOrchestrator:
         hour = timedelta(hours=1)
         agents = [technical_agent, risk_vol_agent]
         assert [a.name for a in agents_due(agents, [], now, hour)] == ["technical", "risk"]
-        done = [AgentRunState("technical", True, now, now), AgentRunState("risk", True, now, now)]
+        done = [
+            AgentRunState("technical", technical_agent.version, True, now, now),
+            AgentRunState("risk", risk_vol_agent.version, True, now, now),
+        ]
         assert agents_due(agents, done, now, hour) == []
 
     def test_retries_failed_and_dead_runs_but_not_running_ones(self) -> None:
         now = datetime(2026, 10, 3, 12)
         hour = timedelta(hours=1)
         runs = [
-            AgentRunState("technical", False, now - timedelta(minutes=10), None),
-            AgentRunState("risk", False, now - timedelta(hours=3), None),
+            AgentRunState("technical", technical_agent.version, False, now - timedelta(minutes=10), None),
+            AgentRunState("risk", risk_vol_agent.version, False, now - timedelta(hours=3), None),
         ]
         assert [a.name for a in agents_due([technical_agent, risk_vol_agent], runs, now, hour)] == ["risk"]
-        assert [a.name for a in agents_due([technical_agent], [AgentRunState("technical", False, now, now)], now, hour)] == ["technical"]
+        assert [
+            a.name for a in agents_due([technical_agent], [AgentRunState("technical", technical_agent.version, False, now, now)], now, hour)
+        ] == ["technical"]

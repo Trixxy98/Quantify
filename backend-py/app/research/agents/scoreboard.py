@@ -5,6 +5,7 @@ from app.research.agents.scoring import newey_west_mean, qlike, spearman
 from app.research.agents.types import AgentOutput, AgentPrediction
 from app.research.bootstrap import Interval, stationary_bootstrap
 from app.research.costs import cost_drag
+from app.research.logistic import brier_skill_score
 from app.research.momentum import top_third_count, weight_turnover
 from app.rows import locale_key
 
@@ -180,5 +181,65 @@ def score_vol_agent(output: AgentOutput) -> dict[str, Any]:
     }
 
 
+def score_prob_agent(output: AgentOutput) -> dict[str, Any]:
+    """Brier skill vs the sample base rate (climatology). One row can be SPY-only (Risk b)."""
+    rows = [row for row in output.predictions if row.realized is not None]
+    # Probabilities: allow thin cross-sections (index view is one name).
+    by_month: dict[str, list[AgentPrediction]] = {}
+    for row in rows:
+        by_month.setdefault(row.month, []).append(row)
+    months = sorted(by_month)
+    forecasts: list[float] = []
+    outcomes: list[float] = []
+    baselines: list[float] = []
+    for month in months:
+        for row in by_month[month]:
+            forecasts.append(row.forecast)
+            outcomes.append(float(row.realized))  # type: ignore[arg-type]
+            baselines.append(row.baseline)
+    n = len(forecasts)
+    skill = brier_skill_score(forecasts, outcomes) if n else None
+    base_rate = mean(outcomes) if outcomes else None
+    interval = _mean_interval([1.0 if (forecasts[i] >= 0.5) == (outcomes[i] >= 0.5) else 0.0 for i in range(n)]) if n >= MIN_VERDICT_MONTHS else None
+
+    verdict = f"Only {n} scored outcomes; too few to judge."
+    if skill is not None and n >= MIN_VERDICT_MONTHS:
+        head = f"Brier skill {skill:.3f} over {n} outcomes (base rate {base_rate:.1%})."
+        body = " Better than always forecasting the base rate." if skill > 0 else " No better than the base rate."
+        verdict = head + body
+
+    return {
+        **_base(output),
+        "metric": "Brier skill vs base rate",
+        "months": len(months),
+        "avgNames": (n / len(months)) if months else None,
+        "from": months[0] if months else None,
+        "to": months[-1] if months else None,
+        "value": skill,
+        "se": None,
+        "tStat": None,
+        "interval": interval,
+        "baseline": {"label": "Climatology base rate", "value": base_rate, "difference": skill, "tStat": None},
+        "extras": [
+            {"label": "Hit rate (forecast ≥ 0.5 matches outcome)", "value": mean([1.0 if (forecasts[i] >= 0.5) == (outcomes[i] >= 0.5) else 0.0 for i in range(n)]) if n else None, "format": "pct"},
+        ],
+        "verdict": verdict,
+    }
+
+
+def score_vol_uplift_agent(output: AgentOutput) -> dict[str, Any]:
+    """Treat like a return-rank IC of forecast vs realized uplift."""
+    scored = score_return_agent(output)
+    baseline = dict(scored["baseline"] or {})
+    baseline["label"] = "Zero uplift IC"
+    return {**scored, "metric": "Spearman IC of vol-uplift forecast", "baseline": baseline}
+
+
 def score_agent(output: AgentOutput) -> dict[str, Any]:
-    return score_vol_agent(output) if output.target == "vol" else score_return_agent(output)
+    if output.target == "vol":
+        return score_vol_agent(output)
+    if output.target in ("probBeatMedian", "probDrawdown"):
+        return score_prob_agent(output)
+    if output.target == "volUplift":
+        return score_vol_uplift_agent(output)
+    return score_return_agent(output)

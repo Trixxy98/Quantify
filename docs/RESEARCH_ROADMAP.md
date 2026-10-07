@@ -449,8 +449,8 @@ the 2026-09-30 forecasts (30 Technical, 39 Risk).
 | Language-model analyst over Phase G | deferred | Only to describe the agents' numbers, never to produce one. Needs an API key and per-call cost |
 | Language-model headline scoring for the Sentiment agent | deferred | Word lists first, because they are testable and free; a local model (Ollama) could be compared against them later on the same recorded headlines |
 | Separate ML service, BullMQ + Redis, TimescaleDB | rejected for now | A second runtime, a queue and a store for a workload that runs in seconds on ~100k rows. The API itself moved to Python (FastAPI) on 2026-10-03, so models live in it directly (principle 6) |
-| Fix `latestSession` DST offset | recommended | Applies today's UTC offset to the session day, so the close is an hour off across a DST change. Ported bug for bug for parity; fix, with a test on the March and November weekends |
-| Fix the covariance matrix behind risk shares | recommended | `sample_covariance_matrix` fills only the upper triangle (the TS original wrote `cov[i][j]` twice). Risk shares and the correlation matrix read zeros below the diagonal. Ported bug for bug; fix and re-check the Risk page |
+| Fix `latestSession` DST offset | done | 2026-10-07: close is built in the exchange zone on the session day, so a weekend that spans a DST change is correct |
+| Fix the covariance matrix behind risk shares | done | 2026-10-07: `sample_covariance_matrix` fills both triangles; Risk shares and correlation no longer read zeros below the diagonal |
 | Gradient-boosted agents | deferred | After G, if a linear agent shows skill worth trying to improve |
 
 ---
