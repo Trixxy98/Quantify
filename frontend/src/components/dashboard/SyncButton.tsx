@@ -11,9 +11,8 @@ export function SyncButton() {
         mutationFn: syncMarketData,
         onSuccess: async () => {
             setMessage("Synced successfully");
-            await queryClient.invalidateQueries({queryKey: ["portfolio"]});
-            await queryClient.invalidateQueries({queryKey: ["portfolios"]});
-            await queryClient.invalidateQueries({queryKey: ["market", "health"]});
+            // Prices, IV snapshots, headlines and agent runs all change, so every page's data is stale.
+            await queryClient.invalidateQueries();
         },
         onError: () => {
             setMessage("Failed to sync market data. Please try again.");

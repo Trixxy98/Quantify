@@ -61,9 +61,10 @@ def refresh(db: Session, refresh_token: str) -> dict[str, str]:
         .where(RefreshToken.token_hash == hash_token(refresh_token), RefreshToken.revoked_at.is_(None), RefreshToken.expires_at > now)
         .values(revoked_at=now)
     )
-    db.commit()
     if result.rowcount != 1:  # type: ignore[attr-defined]
+        db.rollback()
         raise AppError(401, "INVALID_REFRESH_TOKEN", "Refresh token is invalid or expired")
+    # The revocation commits with the new pair, so a failure in between leaves the old token usable.
     return _issue_token_pair(db, payload["sub"])
 
 

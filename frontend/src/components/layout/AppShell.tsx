@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, NavLink, Outlet } from "react-router-dom";
+import { logoutRequest } from "../../api/auth.api";
 import { deletePortfolio } from "../../api/portfolio.api";
 import { usePortfolios } from "../../hooks/usePortfolios";
 import { useAuthStore } from "../../store/auth.store";
@@ -69,6 +70,15 @@ export function AppShell() {
   }, [portfolioId, user?.id, isPortfoliosLoading]);
 
   const selectedPortfolio = portfolios?.find((p) => p.id === portfolioId);
+
+  function handleLogout() {
+    const refreshToken = useAuthStore.getState().refreshToken;
+    logout();
+    // Revoke server-side too; the local session is already gone if this fails.
+    if (refreshToken) {
+      logoutRequest(refreshToken).catch(() => {});
+    }
+  }
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deletePortfolio(id),
@@ -178,7 +188,7 @@ export function AppShell() {
             <SyncButton />
             <span className="hidden h-5 w-px bg-slate-700 sm:block" />
             <span className="hidden text-sm text-[var(--color-text-muted)] sm:inline">{user?.name}</span>
-            <button type="button" onClick={logout} className={ghostButtonClass}>
+            <button type="button" onClick={handleLogout} className={ghostButtonClass}>
               Log out
             </button>
           </div>

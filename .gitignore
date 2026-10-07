@@ -17,8 +17,7 @@ out/
 .nuxt/
 .vite/
 
-# Prisma
-backend/prisma/migrations/dev.db
+# Local databases
 *.db
 *.db-journal
 

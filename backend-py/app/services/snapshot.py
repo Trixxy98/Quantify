@@ -9,6 +9,12 @@ from app.services.fx import SeriesPoint, latest_at_or_before, load_usd_myr_serie
 from app.timeutil import day_ms, from_ms, ms
 
 
+def _clear_snapshots(db: Session, portfolio_id: str) -> int:
+    db.execute(delete(PortfolioSnapshot).where(PortfolioSnapshot.portfolio_id == portfolio_id))
+    db.commit()
+    return 0
+
+
 def rebuild_snapshots(db: Session, portfolio_id: str) -> int:
     portfolio = db.get(Portfolio, portfolio_id)
     if portfolio is None:
@@ -20,9 +26,7 @@ def rebuild_snapshots(db: Session, portfolio_id: str) -> int:
     ).all()
     if not transactions:
         # All transactions deleted: clear obsolete snapshots.
-        db.execute(delete(PortfolioSnapshot).where(PortfolioSnapshot.portfolio_id == portfolio_id))
-        db.commit()
-        return 0
+        return _clear_snapshots(db, portfolio_id)
 
     symbols = list(dict.fromkeys(t.symbol for t in transactions))
     first_date = transactions[0].date
@@ -51,7 +55,8 @@ def rebuild_snapshots(db: Session, portfolio_id: str) -> int:
         price_map.setdefault(row.symbol, []).append({"date": time, "close": float(row.close)})
     calendar = sorted(calendar_set)
     if not calendar:
-        return 0
+        # No bar since the first trade (e.g. its date moved later): earlier rows describe a ledger that no longer exists.
+        return _clear_snapshots(db, portfolio_id)
 
     # Anything that went ex before the portfolio existed is not ours to collect.
     div_index = 0
@@ -123,7 +128,8 @@ def rebuild_snapshots(db: Session, portfolio_id: str) -> int:
         )
 
     if not snapshots:
-        return 0
+        # Same rule as a partial rebuild below, which drops every stored date it did not produce.
+        return _clear_snapshots(db, portfolio_id)
 
     dates = [row["date"] for row in snapshots]
     db.execute(delete(PortfolioSnapshot).where(PortfolioSnapshot.portfolio_id == portfolio_id, PortfolioSnapshot.date.not_in(dates)))

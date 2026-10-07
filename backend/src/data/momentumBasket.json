@@ -1,9 +1,0 @@
-{
-  "asOf": "2026-01-01",
-  "note": "Thirty US large caps, fixed on this date and not re-ranked. The order is approximate market cap, not a live screen.",
-  "symbols": [
-    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "AVGO", "LLY", "JPM", "TSLA",
-    "UNH", "XOM", "V", "MA", "JNJ", "COST", "HD", "PG", "ORCL", "NFLX",
-    "BAC", "ABBV", "KO", "CRM", "CVX", "AMD", "WMT", "MRK", "PEP", "CSCO"
-  ]
-}

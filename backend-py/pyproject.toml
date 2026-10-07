@@ -37,7 +37,6 @@ dev = [
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-q"
-markers = ["contract: live diff against the Node API (needs both servers running)"]
 
 [tool.ruff]
 line-length = 120

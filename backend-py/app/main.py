@@ -23,7 +23,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
         scheduler = start_scheduler()
     else:
-        log.info("[sync] Scheduler disabled (SCHEDULER_ENABLED=false); the Node API owns the cron")
+        log.info("[sync] Scheduler disabled (SCHEDULER_ENABLED=false); no daily sync or startup catch-up in this process")
     yield
     if scheduler is not None:
         scheduler.shutdown(wait=False)

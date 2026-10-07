@@ -209,7 +209,11 @@ def get_factor_exposure(db: Session, portfolio_id: str, user_id: str, range_: st
         notes.append(f"Loadings need {MIN_OBSERVATIONS} overlapping sessions; this range has {len(sample)}.")
         return {**empty, "n": len(sample), "notes": notes}
 
-    fit = ols([row["y"] for row in sample], [row["x"] for row in sample], HAC_LAG)
+    try:
+        fit = ols([row["y"] for row in sample], [row["x"] for row in sample], HAC_LAG)
+    except CollinearError:
+        notes.append("The factor returns in this range are collinear, so the loadings cannot be separated.")
+        return {**empty, "n": len(sample), "notes": notes}
     loadings = [{"factor": factor, "beta": fit["beta"][i + 1], "se": fit["se"][i + 1], "tStat": fit["tStat"][i + 1]} for i, factor in enumerate(FACTOR_NAMES)]
 
     rolling = []
