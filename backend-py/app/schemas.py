@@ -1,4 +1,4 @@
-"""Request schemas mirroring backend/src/validators (zod), with the same messages."""
+"""Request schemas, with the same messages the Node API's zod validators returned."""
 
 import math
 from datetime import UTC, datetime

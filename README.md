@@ -15,7 +15,7 @@ You enter BUY/SELL trades. Quantify rebuilds holdings, pulls Yahoo Finance price
 
 Repo layout: `frontend/` and `backend-py/`. Postgres runs in Docker (`quantify-db` on `127.0.0.1:5434`).
 
-`backend/` is the original Express + Prisma API. The Python API replaced it on 2026-10-03, after every endpoint returned the same JSON on the same database (see [Migration to Python](#migration-to-python)). It stays in the repo only as the reference for a week of parallel checks, and is then deleted.
+The API was Express + Prisma until 2026-10-03 (see [Migration to Python](#migration-to-python)).
 
 ## What it does
 
@@ -138,8 +138,7 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 | Command | What it does |
 | --- | --- |
 | `python -m app [--reload]` | Serve on `API_PORT` |
-| `pytest -m "not contract"` | Unit tests and golden fixtures; pure, no database |
-| `pytest -m contract` | Live checks against the Node API (needs it running and `QUANTIFY_EMAIL`) |
+| `pytest` | Unit tests and golden fixtures; pure, no database |
 | `ruff check .` · `mypy app` | Lint, types |
 | `alembic upgrade head` · `alembic revision --autogenerate -m "..."` | Migrations |
 | `python scripts/sync_daily.py [--force]` | The cron's pass without the API |
@@ -151,7 +150,7 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 
 **Frontend:** `npm run dev` · `npm run build` · `npm run lint`
 
-**CI:** `.github/workflows/ci.yml` runs the Python API's lint, types and tests, and frontend typecheck and lint, on pushes to `main` / `dev` and on pull requests. The tests are pure and need no database. The Node job stays until `backend/` is deleted.
+**CI:** `.github/workflows/ci.yml` runs the Python API's lint, types and tests, and frontend typecheck and lint, on pushes to `main` / `dev` and on pull requests. The tests are pure and need no database.
 
 ### Keeping the recorder running
 
@@ -188,7 +187,7 @@ Optional: `FRED_API_KEY` ([free](https://fredaccount.stlouisfed.org/apikeys)) to
 
 The API moved from Express + Prisma to FastAPI + SQLAlchemy on 2026-10-03, on the same database and with the same JSON contract, so the frontend did not change. Every module was ported against the Node API, not rewritten from its description:
 
-- **Golden fixtures.** `backend/scripts/exportFixtures.ts` ran the TS pure functions on fixed inputs and wrote 166 cases to `backend-py/tests/fixtures/`. The Python ports match them to 1e-9 for plain math and 1e-6 where statsmodels (Newey–West OLS), scikit-learn (ridge) or scipy (`brentq` for implied vol) replaced hand-written solvers. The seeded Mulberry32 bootstrap is reproduced bit for bit, so intervals did not move.
-- **Live contract diff.** `tests/contract/diff.py` called every GET endpoint on both APIs with the same token: 54 responses across two real users, 0 differences. The write paths (create, edit, delete, over-sell, validation errors) were run through both on a throwaway user, with identical holdings, snapshots and metrics afterwards. Tokens and password hashes work across both.
+- **Golden fixtures.** A script in the Node API ran the TS pure functions on fixed inputs and wrote 166 cases to `backend-py/tests/fixtures/`. The Python ports match them to 1e-9 for plain math and 1e-6 where statsmodels (Newey–West OLS), scikit-learn (ridge) or scipy (`brentq` for implied vol) replaced hand-written solvers. The seeded Mulberry32 bootstrap is reproduced bit for bit, so intervals did not move.
+- **Live contract diff.** A diff script called every GET endpoint on both APIs with the same token: 54 responses across two real users, 0 differences. The write paths (create, edit, delete, over-sell, validation errors) were run through both on a throwaway user, with identical holdings, snapshots and metrics afterwards. Tokens and password hashes work across both.
 - **Market data.** `scripts/compare_bars.py` checked that the Python Yahoo client returns exactly the stored OHLC, volume, splits and dividends for all 43 series over 400 days.
 - **Kept on purpose, bug for bug:** `latestSession` applies today's UTC offset to the session day (an hour off across a DST change), and the covariance matrix behind risk shares fills only its upper triangle. Both are listed under recommendations in `docs/RESEARCH_ROADMAP.md` rather than fixed during the port.

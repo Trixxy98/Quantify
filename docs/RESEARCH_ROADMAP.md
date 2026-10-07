@@ -47,7 +47,7 @@ Every module below follows the same rules. If a proposed feature cannot satisfy 
 | Research | Agents G1: orchestrator, Technical and Risk (a) agents, scoreboard, live forecast record | done | Agents page. Live record from 2026-09-30. Headlines recorded forward from 2026-10-03 |
 | Tooling | Chart workspace, saved views | done | |
 | Tests | pytest across metrics, corporate actions, lots, risk math, premium, IV snapshot, OLS, walk-forward, momentum, agents, plus 166 golden cases from the TS implementation | done | `backend-py/tests` |
-| Platform | API moved from Express + Prisma to FastAPI + SQLAlchemy + Alembic, same database and JSON | done | 2026-10-03; 0 differences on 54 live responses. `backend/` kept one week as the reference. File names in the Built notes below are the TS originals; the Python modules use the same names in snake_case under `backend-py/app/` |
+| Platform | API moved from Express + Prisma to FastAPI + SQLAlchemy + Alembic, same database and JSON | done | 2026-10-03; 0 differences on 54 live responses. The Node API was deleted on 2026-10-07. File names in the Built notes below are the TS originals; the Python modules use the same names in snake_case under `backend-py/app/` |
 
 The README *What it is not* section now says there is no chart-pattern signal, and that the one tested rule is 12-1
 momentum, walk-forward, after costs.

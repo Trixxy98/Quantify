@@ -1,4 +1,4 @@
-"""Loads golden cases written by backend/scripts/exportFixtures.ts and compares results with a tolerance."""
+"""Loads golden cases the Node API's pure functions produced before its removal, and compares results with a tolerance."""
 
 import json
 import math

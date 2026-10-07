@@ -6,34 +6,12 @@ on:
   pull_request:
 
 jobs:
-  backend:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-    # Tests are pure; nothing connects. env.ts still validates these on import.
-    env:
-      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
-      JWT_ACCESS_SECRET: ci-access-secret-ci-access-secret-0000
-      JWT_REFRESH_SECRET: ci-refresh-secret-ci-refresh-secret-000
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
-      - run: npm ci
-      - run: npx prisma generate
-      - run: npm run typecheck
-      - run: npm test
-
   backend-py:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend-py
-    # Unit tests are pure; the contract diff needs both servers and is not run here.
+    # Tests are pure; nothing connects. Settings still validates these on import.
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
       JWT_ACCESS_SECRET: ci-access-secret-ci-access-secret-0000
@@ -46,7 +24,7 @@ jobs:
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run mypy app
-      - run: uv run pytest -m "not contract"
+      - run: uv run pytest
 
   frontend:
     runs-on: ubuntu-latest

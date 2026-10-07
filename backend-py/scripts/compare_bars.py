@@ -22,7 +22,7 @@ from app.services import market, yahoo  # noqa: E402
 from app.services.fx import fx_bar_date, is_weekend_date  # noqa: E402
 from app.timeutil import to_utc_date, utcnow  # noqa: E402
 
-BASKET = json.loads((Path(__file__).resolve().parents[2] / "backend/src/data/momentumBasket.json").read_text())["symbols"]
+BASKET = json.loads((Path(__file__).resolve().parents[1] / "app/data/momentumBasket.json").read_text())["symbols"]
 SIX = Decimal("0.000001")
 
 
