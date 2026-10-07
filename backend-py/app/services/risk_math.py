@@ -61,13 +61,13 @@ def kupiec_statistic(breaches: int, trials: int, p: float) -> dict[str, Any] | N
 
 
 def sample_covariance_matrix(columns: Sequence[Sequence[float]]) -> list[list[float]]:
-    # Only the upper triangle is filled; the lower stays 0. This matches the
-    # Node API exactly, which writes cov[i][j] twice instead of cov[j][i].
     n = len(columns)
     cov = [[0.0] * n for _ in range(n)]
     for i in range(n):
         for j in range(i, n):
-            cov[i][j] = 0.0 if len(columns[i]) < 2 else covariance(columns[i], columns[j])
+            value = 0.0 if len(columns[i]) < 2 else covariance(columns[i], columns[j])
+            cov[i][j] = value
+            cov[j][i] = value
     return cov
 
 

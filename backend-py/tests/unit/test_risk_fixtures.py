@@ -45,6 +45,15 @@ def test_bootstrap_statistics_receive_arrays() -> None:
     assert interval["mean"] is not None and interval["sharpe"] is not None
 
 
+def test_sample_covariance_matrix_is_symmetric() -> None:
+    columns = [[0.01, -0.02, 0.03, 0.0], [0.02, 0.01, -0.01, 0.04], [-0.01, 0.0, 0.02, -0.03]]
+    cov = risk_math.sample_covariance_matrix(columns)
+    assert len(cov) == 3
+    for i in range(3):
+        for j in range(3):
+            assert cov[i][j] == cov[j][i]
+
+
 def test_risk_and_bootstrap_match_typescript() -> None:
     # The seeded PRNG and everything drawn from it must match bit for bit.
     check_module("risk", REGISTRY, rel=1e-12)
