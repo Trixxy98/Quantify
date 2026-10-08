@@ -75,6 +75,17 @@ def test_quant_emits_ranks_and_probabilities() -> None:
     assert [row.ok for row in results] == [True, True]
 
 
+def test_earnings_dates_apply_only_to_that_symbol() -> None:
+    data = synthetic(6, 2100, seed=11)
+    # Five names share a month of filings; the sixth is left out and must not be scored.
+    included = data.series[:5]
+    events = [{"date": f"{day[:7]}-10", "type": "EARNINGS", "symbol": series.symbol} for series in included for day in series.dates[::21]]
+    data = AgentInput(data.as_of, data.series, None, events)
+    output = event_agent.run(data)
+    assert output.predictions, output.notes
+    assert data.series[5].symbol not in {row.symbol for row in output.predictions}
+
+
 def test_event_uses_only_scheduled_types() -> None:
     data = synthetic(6, 2100, seed=5)
     events = [{"date": day, "type": "FOMC", "symbol": None} for day in data.series[0].dates if day.endswith("-15")]
