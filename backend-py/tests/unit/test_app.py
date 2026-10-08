@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
+from app.config import cors_origins, settings
 from app.db import sqlalchemy_url
 from app.jsonenc import to_jsonable
 from app.main import app
@@ -14,6 +15,30 @@ def test_health() -> None:
     body = client.get("/health").json()
     assert body["status"] == "ok"
     assert body["timestamp"].endswith("Z") and len(body["timestamp"]) == 24
+
+
+def test_cors_origins_pairs_loopback_hosts() -> None:
+    assert cors_origins("http://localhost:5173") == ["http://localhost:5173", "http://127.0.0.1:5173"]
+    assert cors_origins("http://127.0.0.1:5173") == ["http://127.0.0.1:5173", "http://localhost:5173"]
+    assert cors_origins("http://localhost:5173, http://127.0.0.1:5173") == [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+
+
+def test_login_preflight_accepts_either_loopback() -> None:
+    origins = cors_origins(settings.CORS_ORIGIN)
+    for origin in origins:
+        response = client.options(
+            "/api/auth/login",
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type",
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers["access-control-allow-origin"] == origin
 
 
 def test_unknown_route_uses_node_envelope() -> None:

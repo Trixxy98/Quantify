@@ -31,7 +31,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm bg-[var(--color-surface)] p-8 rounded-xl space-y-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-8">
         <h1 className="text-xl font-semibold text-center">Sign in to Quantify</h1>
 
         {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}

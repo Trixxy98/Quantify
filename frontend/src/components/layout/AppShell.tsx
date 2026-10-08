@@ -32,15 +32,15 @@ const NAV_ITEMS = [
 
 // Tabs read as navigation; the filled pill is what marks the current page.
 const navClass = ({ isActive }: { isActive: boolean }) =>
-  `shrink-0 rounded-md px-3 py-1.5 text-sm transition-colors ${
+  `shrink-0 rounded-md px-2.5 py-1 text-[13px] tracking-wide transition-colors ${
     isActive
       ? "bg-[var(--color-surface)] font-medium text-[var(--color-text)]"
-      : "text-[var(--color-text-muted)] hover:bg-slate-800/60 hover:text-[var(--color-text)]"
+      : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
   }`;
 
 // Matches SyncButton so every header action looks like an action, not a link.
 const ghostButtonClass =
-  "shrink-0 rounded-md border border-slate-600 px-3 py-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]";
+  "shrink-0 rounded-md border border-[var(--color-line)] px-2.5 py-1 text-[13px] text-[var(--color-text-muted)] hover:text-[var(--color-text)]";
 
 export function AppShell() {
   const user = useAuthStore((state) => state.user);
@@ -92,10 +92,10 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-slate-800">
-        <div className="flex h-14 items-center justify-between gap-4 px-6">
+      <header className="sticky top-0 z-30 border-b border-[var(--color-line)] bg-[var(--color-bg)]/90 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <Link to="/dashboard" className="shrink-0 text-base font-semibold tracking-wide">
+            <Link to="/dashboard" className="shrink-0 text-[15px] font-semibold tracking-[0.14em] uppercase">
               Quantify
             </Link>
             {portfolios && portfolios.length > 0 && (
@@ -113,7 +113,7 @@ export function AppShell() {
                     setIsCreating(false);
                     setIsManageOpen(false);
                   }}
-                  className="max-w-[14rem] shrink-0 truncate rounded-md border border-slate-600 bg-transparent px-2 py-1 text-sm font-medium text-[var(--color-text)] outline-none"
+                  className="max-w-[14rem] shrink-0 truncate rounded-md border border-[var(--color-line)] bg-transparent px-2 py-1 text-sm font-medium text-[var(--color-text)] outline-none"
                 >
                   {portfolios.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -137,7 +137,7 @@ export function AppShell() {
                     Manage
                   </button>
                   {isManageOpen && (
-                    <div className="absolute left-0 top-full z-20 mt-2 w-40 rounded-md border border-slate-700 bg-[var(--color-surface)] py-1 text-sm shadow-lg">
+                    <div className="absolute left-0 top-full z-20 mt-2 w-40 rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-sm shadow-lg">
                       <button
                         type="button"
                         className="block w-full px-3 py-1.5 text-left hover:bg-slate-800/80"
@@ -184,7 +184,7 @@ export function AppShell() {
               </>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2.5">
             <SyncButton />
             <span className="hidden h-5 w-px bg-slate-700 sm:block" />
             <span className="hidden text-sm text-[var(--color-text-muted)] sm:inline">{user?.name}</span>
@@ -194,8 +194,8 @@ export function AppShell() {
           </div>
         </div>
 
-        <div className="border-t border-slate-800/70">
-          <nav className="flex gap-1 overflow-x-auto px-6 py-2">
+        <div className="border-t border-[var(--color-line)]">
+          <nav className="mx-auto flex max-w-7xl gap-0.5 overflow-x-auto px-6 py-1.5">
             {NAV_ITEMS.map((item) => (
               <NavLink key={item.to} to={item.to} className={navClass}>
                 {item.label}
@@ -205,7 +205,7 @@ export function AppShell() {
         </div>
       </header>
 
-      <main className="px-6 pt-6 pb-28 space-y-8">
+      <main className="mx-auto max-w-7xl space-y-8 px-6 pt-8 pb-28">
         {!isPortfoliosLoading && !portfolioId && (
           <CreatePortfolioForm onCreated={setSelectedId} />
         )}

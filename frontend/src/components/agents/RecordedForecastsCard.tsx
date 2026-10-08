@@ -12,7 +12,7 @@ export function RecordedForecastsCard({title, caption, recorded, format}: Props)
     const rows = recorded?.rows ?? [];
     return (
         <div className="rounded-xl bg-[var(--color-surface)] p-5">
-            <h2 className="text-sm text-[var(--color-text-muted)]">{title}</h2>
+            <h2 className="text-sm font-medium">{title}</h2>
             <p className="mb-3 text-xs text-[var(--color-text-muted)]">
                 {recorded?.asOf
                     ? `Recorded for ${recorded.asOf} · ${recorded.liveMonths} live month${recorded.liveMonths === 1 ? "" : "s"} so far. ${caption}`
@@ -21,7 +21,7 @@ export function RecordedForecastsCard({title, caption, recorded, format}: Props)
             {rows.length > 0 && (
                 <div className="max-h-80 overflow-y-auto">
                     <table className="w-full text-sm">
-                        <thead className="text-left text-[var(--color-text-muted)]">
+                        <thead className="text-left text-[11px] font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
                             <tr>
                                 <th className="pb-2 font-medium">#</th>
                                 <th className="pb-2 font-medium">Symbol</th>
@@ -32,7 +32,7 @@ export function RecordedForecastsCard({title, caption, recorded, format}: Props)
                         </thead>
                         <tbody>
                             {rows.map((row, index) => (
-                                <tr key={row.symbol} className="border-t border-slate-700">
+                                <tr key={row.symbol} className="border-t border-[var(--color-line)]">
                                     <td className="py-1 text-[var(--color-text-muted)] tabular-nums">{index + 1}</td>
                                     <td className="py-1">{row.symbol}</td>
                                     <td className="py-1 text-right tabular-nums">
