@@ -18,6 +18,7 @@ from app.research.agents.scoreboard import score_agent
 from app.research.agents.technical import MIN_TRAIN_MONTHS
 from app.research.agents.types import AgentInput, SymbolSeries
 from app.services.corporate_actions import load_dividends
+from app.services.earnings import load_earnings_events, record_earnings
 from app.services.events import load_macro
 from app.services.market import get_tracked_symbols, sync_daily_prices
 from app.services.momentum import build_level
@@ -141,7 +142,7 @@ def load_agent_input(db: Session, as_of: str, symbols: list[str]) -> AgentInput:
                 level=[point["level"] for point in build_level([{"date": d, "close": c} for d, c in zip(dates, close, strict=True)], income)],
             )
         )
-    return AgentInput(as_of=as_of, series=series, factors=_load_factors(db, as_of), events=_load_macro_events())
+    return AgentInput(as_of=as_of, series=series, factors=_load_factors(db, as_of), events=_load_events(db, as_of, symbols))
 
 
 def _load_factors(db: Session, as_of: str) -> dict[str, dict[str, float]]:
@@ -157,14 +158,17 @@ def _load_factors(db: Session, as_of: str) -> dict[str, dict[str, float]]:
     return out
 
 
-def _load_macro_events() -> list[dict[str, Any]]:
-    # File only — no Yahoo on the scoreboard path. Earnings can be added later on the month-end pass.
+def _load_events(db: Session, as_of: str, symbols: list[str]) -> list[dict[str, Any]]:
+    """Macro dates from the repo file, plus stored earnings. The scoreboard does not call Yahoo."""
     data = load_macro()
     events: list[dict[str, Any]] = []
     for day in data.get("fomc", []):
-        events.append({"date": day, "type": "FOMC", "symbol": None})
+        if day <= as_of:
+            events.append({"date": day, "type": "FOMC", "symbol": None})
     for day in data.get("cpi", []):
-        events.append({"date": day, "type": "CPI", "symbol": None})
+        if day <= as_of:
+            events.append({"date": day, "type": "CPI", "symbol": None})
+    events.extend(load_earnings_events(db, as_of, symbols))
     return events
 
 
@@ -197,6 +201,7 @@ def run_agents(trigger: str, now: datetime | None = None) -> dict[str, Any]:
             try:
                 symbols = agent_universe(db)
                 refresh_failed = _refresh_universe(db, symbols, as_of)
+                record_earnings(db, symbols)
                 data = load_agent_input(db, as_of, symbols)
             except Exception as err:
                 db.rollback()
@@ -323,7 +328,7 @@ def get_agents_overview(db: Session, now: datetime | None = None) -> dict[str, A
         f"Everything here is out of sample: each month is forecast by a model fitted only on months whose outcome was known beforehand, starting after {MIN_TRAIN_MONTHS} months of training.",
         "With about 70 test months, a mean IC needs to be roughly 0.035 or more to clear t = 2. Monthly t-stats use Newey–West (3 lags); intervals are the 5th–95th percentile of 2,000 stationary bootstrap resamples in 3-month blocks.",
         "The scoreboard is a backtest recomputed from stored prices. Recorded forecasts are the live record, written at each month end before the outcome is known, and are never edited.",
-        "G2 adds Quant, Event and Risk drawdown probability. Macro event dates come from macroEvents.json (no Yahoo on the scoreboard). Five-session horizon helpers live in research/agents/horizon.py; 5d agent entries can be added next.",
+        "G2 adds Quant, Event and Risk drawdown probability. FOMC and CPI dates come from macroEvents.json. Earnings dates are the stored Yahoo filing dates (filled by the daily sync); the scoreboard does not call Yahoo. The same models also report a five-session horizon; decisions stay on the one-month horizon. HAR vol stays one month.",
         "Headlines are recorded forward for the Sentiment agent (G3). It gets no weight until 12 scored months exist.",
     ]
     if data:

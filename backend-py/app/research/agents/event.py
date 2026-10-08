@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+from app.research.agents.horizon import FIVE_SESSIONS, dates_ahead, outcome_return
 from app.research.agents.monthly import (
     fresh_month,
     latest_month_ends,
@@ -17,6 +18,8 @@ from app.research.walk_forward import expanding_folds
 
 EVENT_VERSION = "event-hist-v1"
 EVENT_VOL_VERSION = "event-vol-v1"
+EVENT_5D_VERSION = "event-hist-5d-v1"
+EVENT_VOL_5D_VERSION = "event-vol-5d-v1"
 MIN_TRAIN_MONTHS = 60
 REFIT_MONTHS = 12
 MIN_CROSS_SECTION = 5
@@ -98,6 +101,16 @@ def _normalize_events(raw: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     return out
 
 
+def _types_ahead(events: list[dict[str, Any]], dates: set[str], symbol: str) -> set[str]:
+    types: set[str] = set()
+    for event in events:
+        if event["date"] not in dates:
+            continue
+        if event["symbol"] is None or event["symbol"] == symbol:
+            types.add(event["type"])
+    return types
+
+
 def _types_in_month(events: list[dict[str, Any]], month: str, symbol: str) -> set[str]:
     types: set[str] = set()
     for event in events:
@@ -151,7 +164,7 @@ def _vol_uplift(series: SymbolSeries, start: int, end: int, feature: int) -> flo
     return mean(future_abs) / base - 1
 
 
-def _build_panels(data: AgentInput) -> list[MonthPanel]:
+def _build_panels(data: AgentInput, sessions: int | None = None) -> list[MonthPanel]:
     events = _normalize_events(data.events)
     if not events:
         return []
@@ -172,7 +185,10 @@ def _build_panels(data: AgentInput) -> list[MonthPanel]:
             now = fresh_month(months[s], month, latest)
             if now is None:
                 continue
-            types = _types_in_month(events, nxt_month, series.symbol)
+            if sessions:
+                types = _types_ahead(events, dates_ahead(series, now.index, sessions), series.symbol)
+            else:
+                types = _types_in_month(events, nxt_month, series.symbol)
             if not types:
                 continue
             stats = _past_stats(series, market, events, types, now.date, series.symbol)
@@ -180,29 +196,31 @@ def _build_panels(data: AgentInput) -> list[MonthPanel]:
                 continue
             mean_ar, mean_move = stats
             nxt = fresh_month(months[s], nxt_month, latest)
-            realized = series.level[nxt.index] / series.level[now.index] - 1 if nxt else None
-            if realized is not None and not math.isfinite(realized):
-                realized = None
-            uplift = _vol_uplift(series, now.index, nxt.index, now.feature) if nxt else None
+            realized = outcome_return(series, now.index, nxt.index if nxt else None, sessions)
+            end = now.index + sessions if sessions else (nxt.index if nxt else None)
+            uplift = _vol_uplift(series, now.index, end, now.feature) if end is not None and end < len(series.level) else None
             rows.append(Row(series.symbol, mean_ar, mean_move, realized, uplift))
         if len(rows) >= MIN_CROSS_SECTION:
             panels.append(MonthPanel(month, rows))
     return panels
 
 
-def _empty(agent: str, version: str, target: str, notes: list[str]) -> AgentOutput:
-    return AgentOutput(agent, version, target, "1m", [], notes)
+def _empty(agent: str, version: str, target: str, horizon: str, notes: list[str]) -> AgentOutput:
+    return AgentOutput(agent, version, target, horizon, [], notes)
 
 
-def run_event_return(data: AgentInput) -> AgentOutput:
+def run_event_return(data: AgentInput, sessions: int | None = None) -> AgentOutput:
     base_notes = [
-        "For each name, forecast = mean event-day return (minus SPY/^GSPC when present) on past events whose types are scheduled in the next month.",
+        "For each name, forecast = mean event-day return (minus SPY/^GSPC when present) on past events whose types are scheduled in the next "
+        + (f"{sessions} sessions." if sessions else "month."),
         "Baseline is zero. Only names with a scheduled FOMC, CPI or earnings date in the next month and enough past events are scored.",
         f"Expanding walk-forward: first forecast after {MIN_TRAIN_MONTHS} month ends, refit every {REFIT_MONTHS}.",
     ]
-    panels = _build_panels(data)
+    version = EVENT_5D_VERSION if sessions else EVENT_VERSION
+    horizon = "5d" if sessions else "1m"
+    panels = _build_panels(data, sessions)
     if not (data.events or []):
-        return _empty("event", EVENT_VERSION, "returnScore", [*base_notes, "No events on AgentInput; the orchestrator must load the macro calendar and earnings dates."])
+        return _empty("event", version, "returnScore", horizon, [*base_notes, "No events on AgentInput; the orchestrator must load the macro calendar and earnings dates."])
 
     predictions: list[AgentPrediction] = []
     for fold in expanding_folds(len(panels), MIN_TRAIN_MONTHS, REFIT_MONTHS):
@@ -213,18 +231,20 @@ def run_event_return(data: AgentInput) -> AgentOutput:
     notes = list(base_notes)
     if not predictions:
         notes.append(f"Need {MIN_TRAIN_MONTHS + 1} months with scheduled events and at least {MIN_PAST_EVENTS} past matches per name.")
-    return AgentOutput("event", EVENT_VERSION, "returnScore", "1m", predictions, notes)
+    return AgentOutput("event", version, "returnScore", horizon, predictions, notes)
 
 
-def run_event_vol(data: AgentInput) -> AgentOutput:
+def run_event_vol(data: AgentInput, sessions: int | None = None) -> AgentOutput:
     base_notes = [
         "Vol uplift forecast = mean absolute event-day (abnormal) move on the same past events as the return agent.",
         "Realized uplift = next month's mean |daily return| ÷ trailing 22-session mean |daily return| − 1. Baseline is zero.",
         f"Expanding walk-forward: first forecast after {MIN_TRAIN_MONTHS} month ends, refit every {REFIT_MONTHS}.",
     ]
-    panels = _build_panels(data)
+    version = EVENT_VOL_5D_VERSION if sessions else EVENT_VOL_VERSION
+    horizon = "5d" if sessions else "1m"
+    panels = _build_panels(data, sessions)
     if not (data.events or []):
-        return _empty("event", EVENT_VOL_VERSION, "volUplift", [*base_notes, "No events on AgentInput; the orchestrator must load the calendar first."])
+        return _empty("event", version, "volUplift", horizon, [*base_notes, "No events on AgentInput; the orchestrator must load the calendar first."])
 
     predictions: list[AgentPrediction] = []
     for fold in expanding_folds(len(panels), MIN_TRAIN_MONTHS, REFIT_MONTHS):
@@ -235,8 +255,18 @@ def run_event_vol(data: AgentInput) -> AgentOutput:
     notes = list(base_notes)
     if not predictions:
         notes.append("Not enough scheduled-event history for a vol-uplift forecast yet.")
-    return AgentOutput("event", EVENT_VOL_VERSION, "volUplift", "1m", predictions, notes)
+    return AgentOutput("event", version, "volUplift", horizon, predictions, notes)
+
+
+def run_event_return_5d(data: AgentInput) -> AgentOutput:
+    return run_event_return(data, FIVE_SESSIONS)
+
+
+def run_event_vol_5d(data: AgentInput) -> AgentOutput:
+    return run_event_vol(data, FIVE_SESSIONS)
 
 
 event_agent = Agent(name="event", version=EVENT_VERSION, target="returnScore", horizon="1m", run=run_event_return)
 event_vol_agent = Agent(name="event", version=EVENT_VOL_VERSION, target="volUplift", horizon="1m", run=run_event_vol)
+event_5d_agent = Agent(name="event", version=EVENT_5D_VERSION, target="returnScore", horizon="5d", run=run_event_return_5d)
+event_vol_5d_agent = Agent(name="event", version=EVENT_VOL_5D_VERSION, target="volUplift", horizon="5d", run=run_event_vol_5d)

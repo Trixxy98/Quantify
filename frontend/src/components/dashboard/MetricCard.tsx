@@ -11,7 +11,7 @@ type MetricCardProps = {
 export function MetricCard({label, value, hint, tone, isLoading}: MetricCardProps) {
     return (
         <div className="rounded-xl bg-[var(--color-surface)] p-4 space-y-1">
-            <p className="text-xs text-[var(--color-text-muted)]">{label}</p>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--color-text-muted)]">{label}</p>
             {isLoading ? (
                 <div className="h-7 w-28 rounded bg-slate-700/50 animate-pulse" />
             ) : (

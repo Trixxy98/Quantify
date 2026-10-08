@@ -275,6 +275,17 @@ class NewsHeadline(Base):
     recorded_at: Mapped[datetime] = mapped_column("recordedAt", DateTime, default=utcnow)
 
 
+class EarningsDate(Base):
+    """Announcement dates derived from Yahoo 10-Q/10-K filings. Yahoo has no separate history feed, so the sync stores them."""
+
+    __tablename__ = "EarningsDate"
+    __table_args__ = (Index("EarningsDate_symbol_date_key", "symbol", "date", unique=True),)
+    id: Mapped[str] = _id()
+    symbol: Mapped[str] = mapped_column(Text)
+    date: Mapped[DateType] = mapped_column(Date)
+    recorded_at: Mapped[datetime] = mapped_column("recordedAt", DateTime, default=utcnow)
+
+
 class FactorReturn(Base):
     __tablename__ = "FactorReturn"
     __table_args__ = (Index("FactorReturn_factor_date_idx", "factor", "date"),)

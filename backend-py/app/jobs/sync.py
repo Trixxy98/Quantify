@@ -25,6 +25,7 @@ SyncTrigger = Literal["cron", "manual", "startup", "script"]
 
 def run_full_sync(days_back: int = MAX_DAYS_BACK, trigger: SyncTrigger = "manual") -> dict[str, Any]:
     from app.services.agents import agent_universe, run_agents
+    from app.services.earnings import record_earnings
     from app.services.factors import refresh_factors_if_stale
     from app.services.headlines import record_headlines
     from app.services.implied_snapshot import capture_implied_snapshots
@@ -46,6 +47,7 @@ def run_full_sync(days_back: int = MAX_DAYS_BACK, trigger: SyncTrigger = "manual
         implied = capture_implied_snapshots(db, get_tracked_symbols(db))
         # Same reason as the IV rows: Yahoo serves today's headlines only.
         headlines = record_headlines(db, agent_universe(db))
+        earnings = record_earnings(db, agent_universe(db))
         factors = refresh_factors_if_stale(db)
         run.finished_at = utcnow()
         run.ok = True
@@ -61,6 +63,7 @@ def run_full_sync(days_back: int = MAX_DAYS_BACK, trigger: SyncTrigger = "manual
             "portfolios": portfolios,
             "impliedSnapshots": implied["recorded"],
             "headlines": headlines["recorded"],
+            "earnings": earnings["recorded"],
             "factorsThrough": factors["through"],
             "agents": agents,
         }

@@ -46,7 +46,7 @@ export function TickerTape() {
       <button
         type="button"
         onClick={() => toggle(false)}
-        className="fixed bottom-4 right-4 z-30 rounded-full border border-slate-700 bg-[var(--color-surface)] px-4 py-2 text-sm text-[var(--color-text-muted)] shadow-lg hover:text-[var(--color-text)]"
+        className="fixed bottom-4 right-4 z-30 rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm text-[var(--color-text-muted)] shadow-lg hover:text-[var(--color-text)]"
       >
         Show ticker ▲
       </button>
@@ -58,7 +58,7 @@ export function TickerTape() {
   const items = quotes.map((quote) => <TickerItem key={quote.symbol} quote={quote} />);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-800 bg-[var(--color-bg)]">
+    <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-[var(--color-line)] bg-[var(--color-bg)]/95 backdrop-blur-md">
       <div className="flex items-center gap-4 px-6">
         <span className="flex shrink-0 items-center gap-2 text-sm text-[var(--color-text-muted)]">
           <span

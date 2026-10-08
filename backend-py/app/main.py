@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
+from app.config import cors_origins, settings
 from app.errors import install_error_handlers
 from app.jsonenc import NodeJSONResponse
 from app.routers import auth, events, market, portfolios, research, sync
@@ -32,7 +32,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Quantify API", default_response_class=NodeJSONResponse, lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.CORS_ORIGIN],
+    allow_origins=cors_origins(settings.CORS_ORIGIN),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

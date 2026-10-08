@@ -13,9 +13,9 @@ function result(run: AgentRunView) {
 export function AgentRunsCard({agents, runs}: {agents: AgentsOverview["agents"]; runs: AgentRunView[]}) {
     return (
         <div className="rounded-xl bg-[var(--color-surface)] p-5 overflow-x-auto">
-            <h2 className="mb-3 text-sm text-[var(--color-text-muted)]">Latest month-end pass</h2>
+            <h2 className="mb-3 text-sm font-medium">Latest month-end pass</h2>
             <table className="w-full text-sm">
-                <thead className="text-left text-[var(--color-text-muted)]">
+                <thead className="text-left text-[11px] font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
                     <tr>
                         <th className="pb-2 font-medium">Agent</th>
                         <th className="pb-2 font-medium">Model</th>
@@ -27,16 +27,21 @@ export function AgentRunsCard({agents, runs}: {agents: AgentsOverview["agents"];
                 </thead>
                 <tbody>
                     {agents.map((agent) => {
-                        const run = runs.find((row) => row.agent === agent.name);
+                        const run = runs.find((row) => row.modelVersion === agent.version);
                         return (
-                            <tr key={agent.name} className="border-t border-slate-700">
-                                <td className="py-1.5">{agent.label}</td>
+                            <tr key={agent.version} className="border-t border-[var(--color-line)]">
+                                <td className="py-1.5">
+                                    {agent.label}
+                                    <div className="text-xs text-[var(--color-text-muted)]">
+                                        {agent.target} · {agent.horizon}
+                                    </div>
+                                </td>
                                 <td className="py-1.5 text-[var(--color-text-muted)]">{run?.modelVersion ?? agent.version}</td>
                                 <td className="py-1.5 tabular-nums">{run?.asOf ?? "—"}</td>
                                 <td className="py-1.5">{run?.trigger ?? "—"}</td>
                                 <td className="py-1.5 tabular-nums">{formatTime(run?.finishedAt ?? null)}</td>
                                 <td className="py-1.5">
-                                    {run ? result(run) : <span className="text-[var(--color-text-muted)]">not run yet; npm run agents:run</span>}
+                                    {run ? result(run) : <span className="text-[var(--color-text-muted)]">not run yet</span>}
                                 </td>
                             </tr>
                         );
