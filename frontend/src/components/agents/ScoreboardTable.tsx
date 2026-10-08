@@ -14,7 +14,11 @@ function valueCell(score: AgentScore): string {
 }
 
 export function ScoreboardTable({scores, agents}: {scores: AgentScore[]; agents: AgentsOverview["agents"]}) {
-    const label = (name: AgentScore["agent"]) => agents.find((agent) => agent.name === name)?.label ?? name;
+    const label = (score: AgentScore) => {
+        const agent = agents.find((row) => row.version === score.version) ?? agents.find((row) => row.name === score.agent);
+        const name = agent?.label ?? score.agent;
+        return `${name} · ${score.target}`;
+    };
     return (
         <div className="rounded-xl bg-[var(--color-surface)] p-5 overflow-x-auto">
             <h2 className="mb-1 text-sm text-[var(--color-text-muted)]">Scoreboard, out of sample</h2>
@@ -36,9 +40,9 @@ export function ScoreboardTable({scores, agents}: {scores: AgentScore[]; agents:
                 </thead>
                 <tbody>
                     {scores.map((score) => (
-                        <tr key={score.agent} className="border-t border-slate-700 align-top">
+                        <tr key={score.version} className="border-t border-slate-700 align-top">
                             <td className="py-2">
-                                {label(score.agent)}
+                                {label(score)}
                                 <div className="text-xs text-[var(--color-text-muted)]">{score.version}</div>
                             </td>
                             <td className="py-2">
@@ -70,8 +74,8 @@ export function ScoreboardTable({scores, agents}: {scores: AgentScore[]; agents:
                         <tr>
                             <td colSpan={7} className="pt-3">
                                 {scores.map((score) => (
-                                    <p key={score.agent} className="text-xs">
-                                        <span className="font-medium">{label(score.agent)}.</span> {score.verdict}
+                                    <p key={score.version} className="text-xs">
+                                        <span className="font-medium">{label(score)}.</span> {score.verdict}
                                     </p>
                                 ))}
                             </td>

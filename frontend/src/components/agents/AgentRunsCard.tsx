@@ -27,16 +27,21 @@ export function AgentRunsCard({agents, runs}: {agents: AgentsOverview["agents"];
                 </thead>
                 <tbody>
                     {agents.map((agent) => {
-                        const run = runs.find((row) => row.agent === agent.name);
+                        const run = runs.find((row) => row.modelVersion === agent.version);
                         return (
-                            <tr key={agent.name} className="border-t border-slate-700">
-                                <td className="py-1.5">{agent.label}</td>
+                            <tr key={agent.version} className="border-t border-slate-700">
+                                <td className="py-1.5">
+                                    {agent.label}
+                                    <div className="text-xs text-[var(--color-text-muted)]">
+                                        {agent.target} · {agent.horizon}
+                                    </div>
+                                </td>
                                 <td className="py-1.5 text-[var(--color-text-muted)]">{run?.modelVersion ?? agent.version}</td>
                                 <td className="py-1.5 tabular-nums">{run?.asOf ?? "—"}</td>
                                 <td className="py-1.5">{run?.trigger ?? "—"}</td>
                                 <td className="py-1.5 tabular-nums">{formatTime(run?.finishedAt ?? null)}</td>
                                 <td className="py-1.5">
-                                    {run ? result(run) : <span className="text-[var(--color-text-muted)]">not run yet; npm run agents:run</span>}
+                                    {run ? result(run) : <span className="text-[var(--color-text-muted)]">not run yet</span>}
                                 </td>
                             </tr>
                         );

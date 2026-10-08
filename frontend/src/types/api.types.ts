@@ -527,7 +527,7 @@ export type DataHealth = {
     notes: string[];
 };
 
-export type AgentName = "technical" | "risk";
+export type AgentName = "technical" | "risk" | "quant" | "event";
 
 export type AgentRunView = {
     agent: AgentName;
@@ -544,8 +544,8 @@ export type AgentRunView = {
 export type AgentScore = {
     agent: AgentName;
     version: string;
-    target: "returnScore" | "vol";
-    horizon: "1m";
+    target: "returnScore" | "vol" | "probBeatMedian" | "volUplift" | "probDrawdown";
+    horizon: "1m" | "5d";
     metric: string;
     months: number;
     avgNames: number | null;
@@ -562,6 +562,8 @@ export type AgentScore = {
 
 export type RecordedForecasts = {
     agent: AgentName;
+    target: string;
+    horizon: string;
     asOf: string | null;
     recordedAt: string | null;
     liveMonths: number;
