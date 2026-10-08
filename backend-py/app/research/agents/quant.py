@@ -3,6 +3,7 @@
 import math
 from dataclasses import dataclass
 
+from app.research.agents.horizon import FIVE_SESSIONS, outcome_return
 from app.research.agents.monthly import (
     fresh_month,
     latest_month_ends,
@@ -19,6 +20,8 @@ from app.research.walk_forward import expanding_folds
 
 QUANT_VERSION = "quant-ff-v1"
 QUANT_PROB_VERSION = "quant-ff-prob-v1"
+QUANT_5D_VERSION = "quant-ff-5d-v1"
+QUANT_PROB_5D_VERSION = "quant-ff-prob-5d-v1"
 MIN_TRAIN_MONTHS = 60
 REFIT_MONTHS = 12
 MIN_CROSS_SECTION = 5
@@ -103,7 +106,7 @@ def _factor_features(
     return features if all(math.isfinite(value) for value in features) else None
 
 
-def _build_panels(data: AgentInput) -> list[MonthPanel]:
+def _build_panels(data: AgentInput, sessions: int | None = None) -> list[MonthPanel]:
     factors = data.factors or {}
     if not factors:
         return []
@@ -126,9 +129,7 @@ def _build_panels(data: AgentInput) -> list[MonthPanel]:
             if features is None:
                 continue
             nxt = fresh_month(months[s], shift_month(month, 1), latest)
-            realized = series.level[nxt.index] / series.level[now.index] - 1 if nxt else None
-            if realized is not None and not math.isfinite(realized):
-                realized = None
+            realized = outcome_return(series, now.index, nxt.index if nxt else None, sessions)
             rows.append(Row(series.symbol, features, sum(features), realized))
         if len(rows) >= MIN_CROSS_SECTION:
             panels.append(MonthPanel(month, rows))
@@ -139,8 +140,8 @@ def _trainable(panels: list[MonthPanel], first_test: str) -> list[MonthPanel]:
     return [panel for panel in panels if month_distance(panel.month, first_test) >= 2]
 
 
-def run_quant_return(data: AgentInput) -> AgentOutput:
-    panels = _build_panels(data)
+def run_quant_return(data: AgentInput, sessions: int | None = None) -> AgentOutput:
+    panels = _build_panels(data, sessions)
     predictions: list[AgentPrediction] = []
     for fold in expanding_folds(len(panels), MIN_TRAIN_MONTHS, REFIT_MONTHS):
         test = panels[fold.test_start : fold.test_end]
@@ -151,7 +152,9 @@ def run_quant_return(data: AgentInput) -> AgentOutput:
                 predictions.append(AgentPrediction(panel.month, row.symbol, row.expected, 0.0, row.realized))
 
     notes = [
-        f"Implied edge = rolling {LOADING_WINDOW}-day FF5+Mom loadings × trailing {PREMIA_WINDOW}-day factor premia, read one session before the month-end close.",
+        f"Implied edge = rolling {LOADING_WINDOW}-day FF5+Mom loadings × trailing {PREMIA_WINDOW}-day factor premia, read one session before the month-end close. The outcome is the next {sessions} sessions."
+        if sessions
+        else f"Implied edge = rolling {LOADING_WINDOW}-day FF5+Mom loadings × trailing {PREMIA_WINDOW}-day factor premia, read one session before the month-end close.",
         "Baseline is zero (no expected edge). Scored as a cross-sectional return-rank IC against that baseline.",
         f"Expanding walk-forward: first forecast after {MIN_TRAIN_MONTHS} month ends, then every {REFIT_MONTHS} months (same calendar as Technical).",
         "SPY is included when it is in the universe (index view).",
@@ -160,11 +163,13 @@ def run_quant_return(data: AgentInput) -> AgentOutput:
         notes.append("No Ken French factor rows on the input; the orchestrator must load FactorReturn into AgentInput.factors.")
     elif not predictions:
         notes.append(f"Need {MIN_TRAIN_MONTHS + 1} months with at least {MIN_CROSS_SECTION} names and overlapping factor data before the first forecast.")
-    return AgentOutput("quant", QUANT_VERSION, "returnScore", "1m", predictions, notes)
+    version = QUANT_5D_VERSION if sessions else QUANT_VERSION
+    horizon = "5d" if sessions else "1m"
+    return AgentOutput("quant", version, "returnScore", horizon, predictions, notes)
 
 
-def run_quant_prob(data: AgentInput) -> AgentOutput:
-    panels = _build_panels(data)
+def run_quant_prob(data: AgentInput, sessions: int | None = None) -> AgentOutput:
+    panels = _build_panels(data, sessions)
     predictions: list[AgentPrediction] = []
     for fold in expanding_folds(len(panels), MIN_TRAIN_MONTHS, REFIT_MONTHS):
         test = panels[fold.test_start : fold.test_end]
@@ -202,8 +207,20 @@ def run_quant_prob(data: AgentInput) -> AgentOutput:
     ]
     if not predictions:
         notes.append("Not enough factor-aligned history to fit the probability model yet.")
-    return AgentOutput("quant", QUANT_PROB_VERSION, "probBeatMedian", "1m", predictions, notes)
+    version = QUANT_PROB_5D_VERSION if sessions else QUANT_PROB_VERSION
+    horizon = "5d" if sessions else "1m"
+    return AgentOutput("quant", version, "probBeatMedian", horizon, predictions, notes)
+
+
+def run_quant_return_5d(data: AgentInput) -> AgentOutput:
+    return run_quant_return(data, FIVE_SESSIONS)
+
+
+def run_quant_prob_5d(data: AgentInput) -> AgentOutput:
+    return run_quant_prob(data, FIVE_SESSIONS)
 
 
 quant_agent = Agent(name="quant", version=QUANT_VERSION, target="returnScore", horizon="1m", run=run_quant_return)
 quant_prob_agent = Agent(name="quant", version=QUANT_PROB_VERSION, target="probBeatMedian", horizon="1m", run=run_quant_prob)
+quant_5d_agent = Agent(name="quant", version=QUANT_5D_VERSION, target="returnScore", horizon="5d", run=run_quant_return_5d)
+quant_prob_5d_agent = Agent(name="quant", version=QUANT_PROB_5D_VERSION, target="probBeatMedian", horizon="5d", run=run_quant_prob_5d)

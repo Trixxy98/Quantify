@@ -1,6 +1,7 @@
 import math
 from dataclasses import dataclass
 
+from app.research.agents.horizon import FIVE_SESSIONS, outcome_return
 from app.research.agents.monthly import (
     SymbolMonth,
     fresh_month,
@@ -16,6 +17,7 @@ from app.research.ridge import predict, ridge
 from app.research.walk_forward import expanding_folds
 
 TECHNICAL_VERSION = "technical-ridge-v1"
+TECHNICAL_5D_VERSION = "technical-ridge-5d-v1"
 # Fixed before the first run. Penalty on standardised features against a [-0.5, 0.5] rank target.
 TECHNICAL_LAMBDAS = [0.01, 0.1, 1, 10]
 MIN_TRAIN_MONTHS = 60
@@ -81,7 +83,7 @@ def _standardise(rows: list[dict]) -> list[list[float]]:
     return z
 
 
-def _build_panel(data: AgentInput) -> list[MonthPanel]:
+def _build_panel(data: AgentInput, sessions: int | None = None) -> list[MonthPanel]:
     us = [series for series in data.series if series.market == "US"]
     months = [symbol_months(series) for series in us]
     latest = latest_month_ends(months)
@@ -101,7 +103,7 @@ def _build_panel(data: AgentInput) -> list[MonthPanel]:
             if features is None:
                 continue
             nxt = fresh_month(months[s], shift_month(month, 1), latest)
-            realized = series.level[nxt.index] / series.level[now.index] - 1 if nxt else None
+            realized = outcome_return(series, now.index, nxt.index if nxt else None, sessions)
             raw.append({"symbol": series.symbol, "raw": features, "realized": realized if realized is not None and math.isfinite(realized) else None})
         if len(raw) < MIN_CROSS_SECTION:
             continue
@@ -169,8 +171,8 @@ def choose_lambda(train: list[MonthPanel]) -> float:
     return best
 
 
-def run_technical(data: AgentInput) -> AgentOutput:
-    panels = _build_panel(data)
+def run_technical(data: AgentInput, sessions: int | None = None) -> AgentOutput:
+    panels = _build_panel(data, sessions)
     predictions: list[AgentPrediction] = []
     lambdas: list[float] = []
     for fold in expanding_folds(len(panels), MIN_TRAIN_MONTHS, REFIT_MONTHS):
@@ -186,7 +188,9 @@ def run_technical(data: AgentInput) -> AgentOutput:
                 predictions.append(AgentPrediction(panel.month, row.symbol, predict(beta, row.z), row.raw[MOMENTUM_FEATURE], row.realized))
 
     notes = [
-        f"Cross-sectional ridge on {', '.join(TECHNICAL_FEATURES)}, each standardised across names every month and capped at ±{WINSOR_Z}. The target is next month's total-return rank.",
+        f"Cross-sectional ridge on {', '.join(TECHNICAL_FEATURES)}, each standardised across names every month and capped at ±{WINSOR_Z}. The target is the total-return rank over the next {sessions} sessions."
+        if sessions
+        else f"Cross-sectional ridge on {', '.join(TECHNICAL_FEATURES)}, each standardised across names every month and capped at ±{WINSOR_Z}. The target is next month's total-return rank.",
         f"Expanding walk-forward: at least {MIN_TRAIN_MONTHS} months of training, refit every {REFIT_MONTHS}. The penalty is chosen from {', '.join(_js(v) for v in TECHNICAL_LAMBDAS)} on the last {INNER_BLOCK_MONTHS * INNER_BLOCKS} training months only.",
         "Inputs are read one session before the month-end close, and a training month is only used once its outcome was known before the forecast.",
     ]
@@ -194,7 +198,13 @@ def run_technical(data: AgentInput) -> AgentOutput:
         notes.append(f"Penalties chosen per refit: {', '.join(_js(v) for v in lambdas)}.")
     else:
         notes.append(f"Need {MIN_TRAIN_MONTHS + 1} months with at least {MIN_CROSS_SECTION} names before the first forecast.")
-    return AgentOutput("technical", TECHNICAL_VERSION, "returnScore", "1m", predictions, notes)
+    version = TECHNICAL_5D_VERSION if sessions else TECHNICAL_VERSION
+    horizon = "5d" if sessions else "1m"
+    return AgentOutput("technical", version, "returnScore", horizon, predictions, notes)
+
+
+def run_technical_5d(data: AgentInput) -> AgentOutput:
+    return run_technical(data, FIVE_SESSIONS)
 
 
 def _js(value: float) -> str:
@@ -202,3 +212,4 @@ def _js(value: float) -> str:
 
 
 technical_agent = Agent(name="technical", version=TECHNICAL_VERSION, target="returnScore", horizon="1m", run=run_technical)
+technical_5d_agent = Agent(name="technical", version=TECHNICAL_5D_VERSION, target="returnScore", horizon="5d", run=run_technical_5d)

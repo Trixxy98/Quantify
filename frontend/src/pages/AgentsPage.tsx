@@ -44,13 +44,13 @@ const RECORDED_COPY: Record<string, {title: string; caption: string; format: "sc
 };
 
 function recordedCopy(row: RecordedForecasts) {
-    return (
-        RECORDED_COPY[`${row.agent}|${row.target}`] ?? {
-            title: `${row.agent} · ${row.target}`,
-            caption: `${row.horizon} horizon.`,
-            format: "score" as const,
-        }
-    );
+    const copy = RECORDED_COPY[`${row.agent}|${row.target}`] ?? {
+        title: `${row.agent} · ${row.target}`,
+        caption: `${row.horizon} horizon.`,
+        format: "score" as const,
+    };
+    if (row.horizon !== "5d") return copy;
+    return {...copy, title: `${copy.title} (5 sessions)`};
 }
 
 export default function AgentsPage() {

@@ -328,7 +328,7 @@ def get_agents_overview(db: Session, now: datetime | None = None) -> dict[str, A
         f"Everything here is out of sample: each month is forecast by a model fitted only on months whose outcome was known beforehand, starting after {MIN_TRAIN_MONTHS} months of training.",
         "With about 70 test months, a mean IC needs to be roughly 0.035 or more to clear t = 2. Monthly t-stats use Newey–West (3 lags); intervals are the 5th–95th percentile of 2,000 stationary bootstrap resamples in 3-month blocks.",
         "The scoreboard is a backtest recomputed from stored prices. Recorded forecasts are the live record, written at each month end before the outcome is known, and are never edited.",
-        "G2 adds Quant, Event and Risk drawdown probability. FOMC and CPI dates come from macroEvents.json. Earnings dates are the stored Yahoo filing dates (filled by the daily sync); the scoreboard does not call Yahoo. Five-session horizon helpers live in research/agents/horizon.py; 5d agent entries can be added next.",
+        "G2 adds Quant, Event and Risk drawdown probability. FOMC and CPI dates come from macroEvents.json. Earnings dates are the stored Yahoo filing dates (filled by the daily sync); the scoreboard does not call Yahoo. The same models also report a five-session horizon; decisions stay on the one-month horizon. HAR vol stays one month.",
         "Headlines are recorded forward for the Sentiment agent (G3). It gets no weight until 12 scored months exist.",
     ]
     if data:

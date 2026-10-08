@@ -6,8 +6,9 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.research.agents.event import event_agent, event_vol_agent
-from app.research.agents.orchestrator import AgentRunState, agents_due, run_agent_set
-from app.research.agents.quant import quant_agent, quant_prob_agent
+from app.research.agents.horizon import dates_ahead, next_n_return
+from app.research.agents.orchestrator import AGENTS, AgentRunState, agents_due, run_agent_set
+from app.research.agents.quant import quant_5d_agent, quant_agent, quant_prob_agent
 from app.research.agents.risk_drawdown import risk_drawdown_agent
 from app.research.agents.types import AgentInput, SymbolSeries
 from app.research.french import FACTOR_NAMES
@@ -108,6 +109,29 @@ def test_risk_drawdown_probability_is_a_market_forecast() -> None:
     scored = [row for row in output.predictions if row.realized is not None]
     assert {row.realized for row in scored} <= {0.0, 1.0}
     assert run_agent_set([risk_drawdown_agent], data)[0].ok
+
+
+def test_five_session_quant_is_scored_on_a_shorter_window() -> None:
+    data = synthetic(8, 2100, seed=11)
+    data = AgentInput(data.as_of, data.series, _factors(data.series[0].dates))
+    monthly = quant_agent.run(data)
+    weekly = quant_5d_agent.run(data)
+    assert weekly.horizon == "5d"
+    assert weekly.version != monthly.version
+    scored = [row for row in weekly.predictions if row.realized is not None]
+    assert scored
+    sample = scored[0]
+    series = next(series for series in data.series if series.symbol == sample.symbol)
+    index = max(i for i, day in enumerate(series.dates) if day.startswith(sample.month))
+    assert sample.realized == pytest.approx(next_n_return(series, index))
+    versions = {agent.version for agent in AGENTS}
+    assert quant_5d_agent.version in versions
+    assert len(AGENTS) == 13
+
+
+def test_dates_ahead_is_the_next_five_sessions() -> None:
+    data = synthetic(1, 30, seed=1)
+    assert len(dates_ahead(data.series[0], 0)) == 5
 
 
 def test_same_agent_name_with_a_new_version_is_still_due() -> None:

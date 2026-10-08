@@ -17,7 +17,7 @@ export function ScoreboardTable({scores, agents}: {scores: AgentScore[]; agents:
     const label = (score: AgentScore) => {
         const agent = agents.find((row) => row.version === score.version) ?? agents.find((row) => row.name === score.agent);
         const name = agent?.label ?? score.agent;
-        return `${name} · ${score.target}`;
+        return `${name} · ${score.target}${score.horizon === "5d" ? " · 5d" : ""}`;
     };
     return (
         <div className="rounded-xl bg-[var(--color-surface)] p-5 overflow-x-auto">

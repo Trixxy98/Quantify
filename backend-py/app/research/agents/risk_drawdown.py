@@ -3,12 +3,14 @@
 import math
 from dataclasses import dataclass
 
+from app.research.agents.horizon import FIVE_SESSIONS, next_n_max_drawdown
 from app.research.agents.monthly import fresh_month, latest_month_ends, mean, month_distance, shift_month, symbol_months
 from app.research.agents.types import Agent, AgentInput, AgentOutput, AgentPrediction, SymbolSeries
 from app.research.logistic import CollinearError, logistic, predict_proba
 from app.research.walk_forward import expanding_folds
 
 RISK_DD_VERSION = "risk-dd-v1"
+RISK_DD_5D_VERSION = "risk-dd-5d-v1"
 MIN_TRAIN_MONTHS = 60
 REFIT_MONTHS = 12
 DRAWDOWN_THRESHOLD = -0.05
@@ -153,7 +155,7 @@ def _features(data: AgentInput, market: SymbolSeries, feature: int, feature_day:
     return values if all(math.isfinite(value) for value in values) else None
 
 
-def _build_samples(data: AgentInput) -> tuple[SymbolSeries, list[Sample]] | tuple[None, list[Sample]]:
+def _build_samples(data: AgentInput, sessions: int | None = None) -> tuple[SymbolSeries, list[Sample]] | tuple[None, list[Sample]]:
     market = _market_series(data)
     if market is None:
         return None, []
@@ -174,7 +176,11 @@ def _build_samples(data: AgentInput) -> tuple[SymbolSeries, list[Sample]] | tupl
             continue
         nxt = fresh_month(months, shift_month(month, 1), latest)
         realized = None
-        if nxt is not None:
+        if sessions:
+            dd = next_n_max_drawdown(market, now.index, sessions)
+            if dd is not None:
+                realized = 1.0 if dd <= DRAWDOWN_THRESHOLD else 0.0
+        elif nxt is not None:
             dd = _max_drawdown(market.level, now.index, nxt.index)
             realized = 1.0 if dd <= DRAWDOWN_THRESHOLD else 0.0
         samples.append(Sample(month, features, realized))
@@ -185,17 +191,20 @@ def _trainable(samples: list[Sample], first_test: str) -> list[Sample]:
     return [sample for sample in samples if month_distance(sample.month, first_test) >= 2 and sample.realized is not None]
 
 
-def run_risk_drawdown(data: AgentInput) -> AgentOutput:
-    market, samples = _build_samples(data)
+def run_risk_drawdown(data: AgentInput, sessions: int | None = None) -> AgentOutput:
+    market, samples = _build_samples(data, sessions)
+    window = f"the next {sessions} sessions" if sessions else "the next month"
     notes = [
-        f"Logistic P(market peak-to-trough drawdown ≤ {DRAWDOWN_THRESHOLD:.0%} inside the next month), on {MARKET_PROXY[0]} (or {MARKET_PROXY[1]}).",
+        f"Logistic P(market peak-to-trough drawdown ≤ {DRAWDOWN_THRESHOLD:.0%} inside {window}), on {MARKET_PROXY[0]} (or {MARKET_PROXY[1]}).",
         f"Features at the session before month end: trailing {VOL_WINDOW}-day vol, vol-of-vol, mean pairwise corr of US names, and {TREND_MONTHS}-month index trend.",
         "Baseline is the training-window hit rate (climatology). One forecast per month (index view).",
         f"Expanding walk-forward: at least {MIN_TRAIN_MONTHS} months of training, refit every {REFIT_MONTHS}.",
     ]
     if market is None:
         notes.append("No SPY or ^GSPC series in the input; cannot score the market drawdown agent.")
-        return AgentOutput("risk", RISK_DD_VERSION, "probDrawdown", "1m", [], notes)
+        version = RISK_DD_5D_VERSION if sessions else RISK_DD_VERSION
+        horizon = "5d" if sessions else "1m"
+        return AgentOutput("risk", version, "probDrawdown", horizon, [], notes)
 
     predictions: list[AgentPrediction] = []
     for fold in expanding_folds(len(samples), MIN_TRAIN_MONTHS, REFIT_MONTHS):
@@ -218,7 +227,14 @@ def run_risk_drawdown(data: AgentInput) -> AgentOutput:
 
     if not predictions:
         notes.append(f"Need {MIN_TRAIN_MONTHS + 1} month ends with complete features before the first forecast.")
-    return AgentOutput("risk", RISK_DD_VERSION, "probDrawdown", "1m", predictions, notes)
+    version = RISK_DD_5D_VERSION if sessions else RISK_DD_VERSION
+    horizon = "5d" if sessions else "1m"
+    return AgentOutput("risk", version, "probDrawdown", horizon, predictions, notes)
+
+
+def run_risk_drawdown_5d(data: AgentInput) -> AgentOutput:
+    return run_risk_drawdown(data, FIVE_SESSIONS)
 
 
 risk_drawdown_agent = Agent(name="risk", version=RISK_DD_VERSION, target="probDrawdown", horizon="1m", run=run_risk_drawdown)
+risk_drawdown_5d_agent = Agent(name="risk", version=RISK_DD_5D_VERSION, target="probDrawdown", horizon="5d", run=run_risk_drawdown_5d)
