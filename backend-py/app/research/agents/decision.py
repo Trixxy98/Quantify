@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 
 from app.research.agents.scoring import spearman
 from app.research.agents.types import AgentOutput, AgentPrediction
+from app.research.costs import cost_drag
+from app.research.momentum import weight_turnover
 
 MIN_SCORED_MONTHS = 12
 TRAIL_MONTHS = 12
@@ -249,3 +251,133 @@ def decide_from_outputs(outputs: Sequence[AgentOutput]) -> Decision:
             drawdown = by_month.get(month)
             history = [by_month[key] for key in sorted(by_month) if key < month]
     return decide(agents, vols, drawdown, history, month)
+
+
+def _return_outputs(outputs: Sequence[AgentOutput]) -> list[AgentOutput]:
+    return [output for output in outputs if output.horizon == "1m" and output.target == "returnScore" and output.agent in RETURN_AGENTS]
+
+
+def _realized(outputs: Sequence[AgentOutput]) -> dict[str, dict[str, float]]:
+    """Next-month total return already stored on each forecast row."""
+    by_month: dict[str, dict[str, float]] = {}
+    for output in _return_outputs(outputs):
+        for row in output.predictions:
+            if row.realized is None:
+                continue
+            by_month.setdefault(row.month, {}).setdefault(row.symbol, row.realized)
+    return by_month
+
+
+def _views_as_of(outputs: Sequence[AgentOutput], month: str) -> list[AgentView]:
+    views: list[AgentView] = []
+    for output in _return_outputs(outputs):
+        forecasts = {row.symbol: row.forecast for row in output.predictions if row.month == month}
+        if len(forecasts) < MIN_NAMES:
+            continue
+        past = [row for row in output.predictions if row.month < month]
+        views.append(AgentView(output.agent, forecasts, monthly_ic(past)))
+    return views
+
+
+def _risk_as_of(outputs: Sequence[AgentOutput], month: str) -> tuple[dict[str, float], float | None, list[float]]:
+    vols: dict[str, float] = {}
+    drawdown: float | None = None
+    history: list[float] = []
+    for output in outputs:
+        if output.horizon != "1m" or output.agent != "risk":
+            continue
+        if output.target == "vol":
+            vols = {row.symbol: row.forecast for row in output.predictions if row.month == month and row.forecast > 0}
+        elif output.target == "probDrawdown":
+            by_month = {row.month: row.forecast for row in output.predictions}
+            drawdown = by_month.get(month)
+            history = [by_month[key] for key in sorted(by_month) if key < month]
+    return vols, drawdown, history
+
+
+def _book_return(weights: dict[str, float], rets: dict[str, float]) -> float:
+    return sum(weight * rets.get(symbol, 0.0) for symbol, weight in weights.items())
+
+
+def _drift(weights: dict[str, float], rets: dict[str, float], book: float) -> dict[str, float]:
+    denom = 1 + book
+    if not denom > 1e-8:
+        return dict(weights)
+    return {symbol: weight * (1 + rets.get(symbol, 0.0)) / denom for symbol, weight in weights.items()}
+
+
+def _top_equal(forecasts: dict[str, float]) -> dict[str, float]:
+    ordered = sorted(forecasts, key=lambda symbol: forecasts[symbol], reverse=True)
+    count = max(1, math.ceil(len(ordered) / 3))
+    return {symbol: 1 / count for symbol in ordered[:count]}
+
+
+def _best_book(views: Sequence[AgentView]) -> tuple[str | None, dict[str, float]]:
+    eligible = [(view, ic) for view in views if (ic := trailing_ic(view.monthly_ic)) is not None and ic > 0]
+    if not eligible:
+        return None, {}
+    view = max(eligible, key=lambda item: item[1])[0]
+    return view.name, _top_equal(view.forecasts)
+
+
+def evaluate(outputs: Sequence[AgentOutput], benchmark: dict[str, float] | None = None) -> dict[str, object]:
+    """Mark the decision book to market after costs. Information coefficients use only earlier months."""
+    realized = _realized(outputs)
+    months = [month for month, rows in sorted(realized.items()) if len(rows) >= MIN_NAMES]
+    levels = {"strategy": 100.0, "buyHold": 100.0, "equalWeight": 100.0, "bestAgent": 100.0, "benchmark": 100.0}
+    held: dict[str, float] = {}
+    buy: dict[str, float] = {}
+    equal_held: dict[str, float] = {}
+    best_held: dict[str, float] = {}
+    best_name: str | None = None
+    points: list[dict[str, object]] = []
+    for month in months:
+        rets = realized[month]
+        views = _views_as_of(outputs, month)
+        vols, drawdown, history = _risk_as_of(outputs, month)
+        decision = decide(views, vols, drawdown, history, month)
+        target = {row.symbol: row.weight for row in decision.rows if row.action == "hold"}
+        gross = _book_return(target, rets)
+        net = gross - cost_drag(weight_turnover(held, target))
+        held = _drift(target, rets, gross)
+
+        names = sorted(rets)
+        equal = {symbol: 1 / len(names) for symbol in names}
+        if not buy:
+            buy = dict(equal)
+            buy_gross = _book_return(buy, rets)
+            buy_net = buy_gross - cost_drag(weight_turnover({}, buy))
+            buy = _drift(buy, rets, buy_gross)
+        else:
+            buy_gross = _book_return(buy, rets)
+            buy_net = buy_gross
+            buy = _drift(buy, rets, buy_gross)
+        equal_gross = _book_return(equal, rets)
+        equal_net = equal_gross - cost_drag(weight_turnover(equal_held, equal))
+        equal_held = _drift(equal, rets, equal_gross)
+
+        name, best_target = _best_book(views)
+        if name:
+            best_name = name
+        best_gross = _book_return(best_target, rets)
+        best_net = best_gross - cost_drag(weight_turnover(best_held, best_target))
+        best_held = _drift(best_target, rets, best_gross)
+
+        bench = None if benchmark is None else benchmark.get(month)
+        levels["strategy"] *= 1 + net
+        levels["buyHold"] *= 1 + buy_net
+        levels["equalWeight"] *= 1 + equal_net
+        levels["bestAgent"] *= 1 + best_net
+        if bench is not None:
+            levels["benchmark"] *= 1 + bench
+        points.append(
+            {
+                "month": month,
+                "strategy": levels["strategy"],
+                "buyHold": levels["buyHold"],
+                "equalWeight": levels["equalWeight"],
+                "bestAgent": levels["bestAgent"],
+                "benchmark": None if bench is None else levels["benchmark"],
+            }
+        )
+    return {"equity": points, "bestAgent": best_name, "months": len(points)}

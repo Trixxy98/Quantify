@@ -594,5 +594,19 @@ export type AgentsOverview = {
         rows: {symbol: string; weight: number; action: string; reason: string; rules: string[]}[];
         notes: string[];
     };
+    evaluation: {
+        equity: {
+            month: string;
+            strategy: number;
+            buyHold: number;
+            equalWeight: number;
+            bestAgent: number;
+            benchmark: number | null;
+        }[];
+        bestAgent: string | null;
+        months: number;
+        alpha: {annualized: number; tStat: number; n: number} | null;
+        notes: string[];
+    };
     notes: string[];
 };

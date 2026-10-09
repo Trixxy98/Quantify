@@ -1,6 +1,7 @@
 """Decision rules on synthetic scores. No database and no model fit."""
 
-from app.research.agents.decision import AgentView, decide
+from app.research.agents.decision import AgentView, decide, evaluate
+from app.research.agents.types import AgentOutput, AgentPrediction
 
 
 def _ics(value: float, months: int = 12) -> list[float]:
@@ -78,3 +79,26 @@ def test_high_drawdown_probability_halves_exposure() -> None:
     assert abs(cash.weight - 0.5) < 1e-9
     assert "halved" in cash.reason
     assert "risk-limit" in cash.rules
+
+
+def test_equity_charges_costs_and_marks_the_book() -> None:
+    symbols = ["A", "B", "C", "D", "E", "F"]
+    predictions: list[AgentPrediction] = []
+    vols: list[AgentPrediction] = []
+    for index in range(13):
+        year, month_number = divmod(index, 12)
+        month = f"{2020 + year}-{month_number + 1:02d}"
+        for symbol in symbols:
+            predictions.append(AgentPrediction(month, symbol, 1.0 if symbol == "A" else 0.0, 0.0, 0.10 if symbol == "A" else 0.0))
+            vols.append(AgentPrediction(month, symbol, 0.20, 0.20, None))
+    ranked = AgentOutput("technical", "technical-ridge-v1", "returnScore", "1m", predictions, [])
+    risk = AgentOutput("risk", "risk-har-v1", "vol", "1m", vols, [])
+    curve = evaluate([ranked, risk], {"2021-01": 0.01})
+    points = curve["equity"]
+    assert isinstance(points, list)
+    last = points[-1]
+    # Twelve prior months unlock the book. The tied names are not above the median, so only A is held.
+    # Entering from cash turns the whole book over: 10 bps off A's 10%.
+    assert last["month"] == "2021-01"
+    assert abs(float(last["strategy"]) - 100 * (1 + 0.10 - 0.001)) < 1e-6
+    assert last["benchmark"] is not None

@@ -1,5 +1,6 @@
 import {useMemo, useState} from "react";
 import {AgentRunsCard} from "../components/agents/AgentRunsCard";
+import {DecisionEquityChart} from "../components/agents/DecisionEquityChart";
 import {DecisionsCard} from "../components/agents/DecisionsCard";
 import {RecordedForecastsCard} from "../components/agents/RecordedForecastsCard";
 import {ScoreboardTable} from "../components/agents/ScoreboardTable";
@@ -151,6 +152,7 @@ export default function AgentsPage() {
             </section>
 
             {data && <DecisionsCard decisions={data.decisions} />}
+            {data && <DecisionEquityChart evaluation={data.evaluation} />}
 
             {view && view.families.length > 0 && (
                 <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
