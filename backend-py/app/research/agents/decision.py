@@ -381,3 +381,44 @@ def evaluate(outputs: Sequence[AgentOutput], benchmark: dict[str, float] | None 
             }
         )
     return {"equity": points, "bestAgent": best_name, "months": len(points)}
+
+
+def _forecasts_by_month(output: AgentOutput) -> dict[str, dict[str, float]]:
+    by_month: dict[str, dict[str, float]] = {}
+    for row in output.predictions:
+        by_month.setdefault(row.month, {})[row.symbol] = row.forecast
+    return by_month
+
+
+def forecast_correlation(outputs: Sequence[AgentOutput]) -> dict[str, object]:
+    """Mean monthly Spearman correlation of one-month return ranks, across shared names."""
+    books = {output.agent: _forecasts_by_month(output) for output in _return_outputs(outputs)}
+    agents = [name for name in RETURN_AGENTS if name in books]
+    pairs: list[dict[str, object]] = []
+    for i, left in enumerate(agents):
+        for right in agents[i + 1 :]:
+            values: list[float] = []
+            latest_month: str | None = None
+            latest: float | None = None
+            months = sorted(set(books[left]) & set(books[right]))
+            for month in months:
+                shared = sorted(set(books[left][month]) & set(books[right][month]))
+                if len(shared) < MIN_NAMES:
+                    continue
+                value = spearman([books[left][month][symbol] for symbol in shared], [books[right][month][symbol] for symbol in shared])
+                if value != value:
+                    continue
+                values.append(value)
+                latest_month = month
+                latest = value
+            pairs.append(
+                {
+                    "left": left,
+                    "right": right,
+                    "mean": None if not values else sum(values) / len(values),
+                    "latest": latest,
+                    "latestMonth": latest_month,
+                    "months": len(values),
+                }
+            )
+    return {"agents": agents, "pairs": pairs}

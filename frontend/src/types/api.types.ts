@@ -608,5 +608,9 @@ export type AgentsOverview = {
         alpha: {annualized: number; tStat: number; n: number} | null;
         notes: string[];
     };
+    correlation: {
+        agents: string[];
+        pairs: {left: string; right: string; mean: number | null; latest: number | null; latestMonth: string | null; months: number}[];
+    };
     notes: string[];
 };

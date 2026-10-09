@@ -23,7 +23,7 @@ from app.models import (
     new_id,
     table_of,
 )
-from app.research.agents.decision import decide_from_outputs, evaluate
+from app.research.agents.decision import decide_from_outputs, evaluate, forecast_correlation
 from app.research.agents.monthly import shift_month
 from app.research.agents.orchestrator import AGENTS, AgentRunState, agents_due, completed_month_end, run_agent_set
 from app.research.agents.scoreboard import score_agent
@@ -515,5 +515,6 @@ def get_agents_overview(db: Session, now: datetime | None = None) -> dict[str, A
         "headlines": _headline_progress(db),
         "decisions": _decision_view(db, results, as_of),
         "evaluation": _evaluation_view(db, results),
+        "correlation": forecast_correlation([result.output for result in results if result.ok and result.output]),
         "notes": notes,
     }

@@ -1,6 +1,6 @@
 """Decision rules on synthetic scores. No database and no model fit."""
 
-from app.research.agents.decision import AgentView, decide, evaluate
+from app.research.agents.decision import AgentView, decide, evaluate, forecast_correlation
 from app.research.agents.types import AgentOutput, AgentPrediction
 
 
@@ -102,3 +102,17 @@ def test_equity_charges_costs_and_marks_the_book() -> None:
     assert last["month"] == "2021-01"
     assert abs(float(last["strategy"]) - 100 * (1 + 0.10 - 0.001)) < 1e-6
     assert last["benchmark"] is not None
+
+
+def test_identical_return_ranks_correlate_at_one() -> None:
+    symbols = ["A", "B", "C", "D", "E", "F"]
+    shared = [AgentPrediction("2020-01", symbol, float(index), 0.0, None) for index, symbol in enumerate(symbols)]
+    flipped = [AgentPrediction("2020-01", symbol, float(len(symbols) - index), 0.0, None) for index, symbol in enumerate(symbols)]
+    technical = AgentOutput("technical", "t", "returnScore", "1m", shared, [])
+    quant = AgentOutput("quant", "q", "returnScore", "1m", shared, [])
+    event = AgentOutput("event", "e", "returnScore", "1m", flipped, [])
+    matrix = forecast_correlation([technical, quant, event])
+    pairs = { (row["left"], row["right"]): row for row in matrix["pairs"] }  # type: ignore[union-attr]
+    assert pairs[("technical", "quant")]["mean"] == 1
+    assert pairs[("technical", "event")]["mean"] == -1
+    assert pairs[("quant", "event")]["latestMonth"] == "2020-01"
