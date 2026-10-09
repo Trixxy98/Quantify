@@ -12,7 +12,18 @@ from sqlalchemy.orm import Session
 from app.db import SessionLocal
 from app.jobs.market_session import latest_session
 from app.jobs.state import finish_agents, try_start_agents
-from app.models import AgentForecast, AgentRun, BenchmarkPrice, DailyPrice, FactorReturn, NewsHeadline, new_id, table_of
+from app.models import (
+    AgentDecision,
+    AgentForecast,
+    AgentRun,
+    BenchmarkPrice,
+    DailyPrice,
+    FactorReturn,
+    NewsHeadline,
+    new_id,
+    table_of,
+)
+from app.research.agents.decision import decide_from_outputs
 from app.research.agents.orchestrator import AGENTS, AgentRunState, agents_due, completed_month_end, run_agent_set
 from app.research.agents.scoreboard import score_agent
 from app.research.agents.technical import MIN_TRAIN_MONTHS
@@ -31,6 +42,11 @@ HISTORY_FROM = datetime(2015, 1, 1)
 AGENT_IN_FLIGHT = timedelta(hours=1)
 REFRESH_WORKERS = 3
 INDEX_VIEW_SYMBOLS = ("SPY",)
+DECISION_AGENTS = [
+    agent
+    for agent in AGENTS
+    if agent.horizon == "1m" and (agent.target == "returnScore" or (agent.name == "risk" and agent.target in ("vol", "probDrawdown")))
+]
 
 AGENT_INFO = {
     "technical": {
@@ -193,6 +209,7 @@ def run_agents(trigger: str, now: datetime | None = None) -> dict[str, Any]:
             ]
             due = agents_due(AGENTS, previous, now, AGENT_IN_FLIGHT)
             if not due:
+                _ensure_decisions(db, as_of_date)
                 return {"ran": False, "asOf": as_of, "reason": f"every agent already ran for {as_of}"}
 
             runs = [AgentRun(agent=agent.name, as_of=as_of_date, trigger=trigger, model_version=agent.version) for agent in due]
@@ -243,6 +260,7 @@ def run_agents(trigger: str, now: datetime | None = None) -> dict[str, Any]:
                 run.rows = len(rows)
                 db.commit()
                 summary.append({"agent": agent.name, "ok": True, "rows": inserted, "error": None})
+            _ensure_decisions(db, as_of_date, data)
             return {"ran": True, "asOf": as_of, "refreshFailed": refresh_failed, "agents": summary}
     finally:
         finish_agents()
@@ -299,6 +317,64 @@ def _recorded_forecasts(db: Session, agent: str, target: str, horizon: str) -> d
     }
 
 
+def _ensure_decisions(db: Session, as_of: date, data: AgentInput | None = None) -> None:
+    """Write the month's book once. A later pass leaves the rows alone."""
+    existing = db.scalar(select(func.count()).select_from(AgentDecision).where(AgentDecision.as_of == as_of)) or 0
+    if existing:
+        return
+    if data is None:
+        data = load_agent_input(db, date_key(as_of), agent_universe(db))
+    results = run_agent_set(DECISION_AGENTS, data)
+    decision = decide_from_outputs([result.output for result in results if result.ok and result.output])
+    if not decision.rows:
+        return
+    table = table_of(AgentDecision)
+    db.execute(
+        insert(table)
+        .values(
+            [
+                {
+                    "id": new_id(),
+                    "asOf": as_of,
+                    "symbol": row.symbol,
+                    "weight": row.weight,
+                    "action": row.action,
+                    "reason": row.reason,
+                    "rules": json.dumps(row.rules),
+                    "createdAt": utcnow(),
+                }
+                for row in decision.rows
+            ]
+        )
+        .on_conflict_do_nothing()
+    )
+    db.commit()
+
+
+def _decision_view(db: Session, results: list[Any], as_of: str | None) -> dict[str, Any]:
+    outputs = [result.output for result in results if result.ok and result.output]
+    decision = decide_from_outputs(outputs)
+    stored_on = date.fromisoformat(as_of) if as_of else None
+    stored = (
+        db.scalars(select(AgentDecision).where(AgentDecision.as_of == stored_on).order_by(AgentDecision.weight.desc())).all()
+        if stored_on
+        else []
+    )
+    if stored:
+        rows = [
+            {"symbol": row.symbol, "weight": float(row.weight), "action": row.action, "reason": row.reason, "rules": json.loads(row.rules)}
+            for row in stored
+        ]
+        recorded = True
+    else:
+        rows = [
+            {"symbol": row.symbol, "weight": row.weight, "action": row.action, "reason": row.reason, "rules": row.rules}
+            for row in decision.rows
+        ]
+        recorded = False
+    return {"month": decision.month, "recorded": recorded, "weights": decision.weights, "rows": rows, "notes": decision.notes}
+
+
 def _headline_progress(db: Session) -> dict[str, Any]:
     total = db.scalar(select(func.count()).select_from(NewsHeadline)) or 0
     symbols = db.scalar(select(func.count(func.distinct(NewsHeadline.symbol)))) or 0
@@ -329,7 +405,7 @@ def get_agents_overview(db: Session, now: datetime | None = None) -> dict[str, A
         "With about 70 test months, a mean IC needs to be roughly 0.035 or more to clear t = 2. Monthly t-stats use Newey–West (3 lags); intervals are the 5th–95th percentile of 2,000 stationary bootstrap resamples in 3-month blocks.",
         "The scoreboard is a backtest recomputed from stored prices. Recorded forecasts are the live record, written at each month end before the outcome is known, and are never edited.",
         "G2 adds Quant, Event and Risk drawdown probability. FOMC and CPI dates come from macroEvents.json. Earnings dates are the stored Yahoo filing dates (filled by the daily sync); the scoreboard does not call Yahoo. The same models also report a five-session horizon; decisions stay on the one-month horizon. HAR vol stays one month.",
-        "Headlines are recorded forward for the Sentiment agent (G3). It gets no weight until 12 scored months exist.",
+        "The decision engine combines the one-month Technical, Quant and Event ranks. Sentiment has no weight until 12 scored months exist. Five-session forecasts are not used.",
     ]
     if data:
         present = {series.symbol for series in data.series}
@@ -365,5 +441,6 @@ def get_agents_overview(db: Session, now: datetime | None = None) -> dict[str, A
         "scoreboard": [score_agent(result.output) for result in results if result.ok and result.output],
         "recorded": [_recorded_forecasts(db, agent.name, agent.target, agent.horizon) for agent in AGENTS],
         "headlines": _headline_progress(db),
+        "decisions": _decision_view(db, results, as_of),
         "notes": notes,
     }

@@ -1,5 +1,6 @@
 import {useMemo, useState} from "react";
 import {AgentRunsCard} from "../components/agents/AgentRunsCard";
+import {DecisionsCard} from "../components/agents/DecisionsCard";
 import {RecordedForecastsCard} from "../components/agents/RecordedForecastsCard";
 import {ScoreboardTable} from "../components/agents/ScoreboardTable";
 import {MetricCard} from "../components/dashboard/MetricCard";
@@ -148,6 +149,8 @@ export default function AgentsPage() {
                     isLoading={isLoading}
                 />
             </section>
+
+            {data && <DecisionsCard decisions={data.decisions} />}
 
             {view && view.families.length > 0 && (
                 <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

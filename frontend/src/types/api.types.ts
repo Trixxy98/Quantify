@@ -587,5 +587,12 @@ export type AgentsOverview = {
     scoreboard: AgentScore[];
     recorded: RecordedForecasts[];
     headlines: {total: number; symbols: number; since: string | null; latest: string | null};
+    decisions: {
+        month: string | null;
+        recorded: boolean;
+        weights: Record<string, number>;
+        rows: {symbol: string; weight: number; action: string; reason: string; rules: string[]}[];
+        notes: string[];
+    };
     notes: string[];
 };
