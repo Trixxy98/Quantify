@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { HoldingsTable } from "../components/dashboard/HoldingsTable";
 import { ClosedLotsTable } from "../components/dashboard/ClosedLotsTable";
+import { TimingCard } from "../components/dashboard/TimingCard";
 import { PriceChart } from "../components/dashboard/PriceChart";
 import { RangeChips } from "../components/dashboard/RangeChips";
 import type { AppShellContext } from "../components/layout/AppShell";
@@ -66,6 +67,7 @@ export default function HoldingsPage() {
         selectedSymbol={selectedSymbol}
         onSelectSymbol={setPickedSymbol}
       />
+      <TimingCard timing={closed?.timing} />
       <ClosedLotsTable
         lots={closed?.lots}
         currency={currency}

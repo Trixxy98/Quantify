@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { AddTransactionForm } from "../components/dashboard/AddTransactionForm";
+import { TimingCard } from "../components/dashboard/TimingCard";
 import { TransactionsTable } from "../components/dashboard/TransactionsTable";
+import { useTransactions } from "../hooks/useTransactions";
 import type { AppShellContext } from "../components/layout/AppShell";
 import type { Transaction } from "../types/api.types";
 
@@ -15,6 +17,8 @@ export default function TransactionsPage() {
     setEditing(null);
   }
 
+  const { data } = useTransactions(portfolioId, 1);
+
   if (!portfolioId) return null;
 
   return (
@@ -26,6 +30,7 @@ export default function TransactionsPage() {
         editing={editing}
         onCancelEdit={() => setEditing(null)}
       />
+      <TimingCard timing={data?.timing} />
       <TransactionsTable
         key={portfolioId}
         portfolioId={portfolioId}

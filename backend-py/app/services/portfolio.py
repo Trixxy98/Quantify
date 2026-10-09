@@ -1,5 +1,5 @@
 import math
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -8,12 +8,13 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.errors import AppError
-from app.models import Holding, Portfolio, StockSplit, Transaction, TransactionType, new_id, table_of
+from app.models import DailyPrice, Holding, Portfolio, StockSplit, Transaction, TransactionType, new_id, table_of
+from app.research.timing import mark_fill, summarize
 from app.rows import exchange_from_symbol, js_number_string, row_dict
 from app.services.corporate_actions import SplitRow, adjust_trade
 from app.services.lots import realize_portfolio
 from app.services.valuation import mark_open_positions
-from app.timeutil import ms, utcnow
+from app.timeutil import date_key, ms, utcnow
 
 
 def get_owned_portfolio(db: Session, portfolio_id: str, user_id: str) -> Portfolio:
@@ -229,6 +230,29 @@ def delete_transaction(db: Session, portfolio_id: str, transaction_id: str, user
     _refresh_quietly(db, portfolio_id, [symbol])
 
 
+def _timing_report(db: Session, transactions: list[Transaction]) -> tuple[dict[str, dict[str, float | None]], dict[str, Any]]:
+    if not transactions:
+        return {}, summarize([])
+    symbols = {row.symbol for row in transactions}
+    earliest = min(date_key(row.date) for row in transactions)
+    bars: dict[str, list[tuple[str, float]]] = {}
+    prices = db.execute(
+        select(DailyPrice.symbol, DailyPrice.date, DailyPrice.close)
+        .where(DailyPrice.symbol.in_(symbols), DailyPrice.date >= date.fromisoformat(earliest))
+        .order_by(DailyPrice.symbol, DailyPrice.date)
+    ).all()
+    for price in prices:
+        bars.setdefault(price.symbol, []).append((date_key(price.date), float(price.close)))
+    marks: dict[str, dict[str, float | None]] = {}
+    fills: list[tuple[str, dict[str, float | None]]] = []
+    for row in transactions:
+        side = row.type.value
+        marked = mark_fill(side, float(row.price), date_key(row.date), bars.get(row.symbol, []))
+        marks[row.id] = marked
+        fills.append((side, marked))
+    return marks, summarize(fills)
+
+
 def list_transactions(db: Session, portfolio_id: str, user_id: str, symbol: str | None, page: int, limit: int) -> dict[str, Any]:
     portfolio = get_owned_portfolio(db, portfolio_id, user_id)
     conditions = [Transaction.portfolio_id == portfolio_id]
@@ -242,6 +266,8 @@ def list_transactions(db: Session, portfolio_id: str, user_id: str, symbol: str 
         .limit(limit)
     ).all()
     total = db.scalar(select(func.count()).select_from(Transaction).where(*conditions)) or 0
+    everyone = db.scalars(select(Transaction).where(*conditions)).all()
+    marks, timing = _timing_report(db, list(everyone))
     sells, _ = realize_portfolio(db, portfolio_id, portfolio.base_currency.value)
     data = []
     for row in rows:
@@ -253,12 +279,19 @@ def list_transactions(db: Session, portfolio_id: str, user_id: str, symbol: str 
                 "realizedPnLPct": sell["realizedPnLPct"] if sell else None,
                 "realizedPnLBase": sell["realizedPnLBase"] if sell else None,
                 "closedPosition": sell["closedPosition"] if sell else False,
+                "timing": marks.get(row.id, {"sameDay": None, "sessions5": None, "sessions20": None}),
             }
         )
-    return {"data": data, "pagination": {"page": page, "limit": limit, "total": total, "totalPages": math.ceil(total / limit)}}
+    return {
+        "data": data,
+        "pagination": {"page": page, "limit": limit, "total": total, "totalPages": math.ceil(total / limit)},
+        "timing": timing,
+    }
 
 
 def list_closed_lots(db: Session, portfolio_id: str, user_id: str) -> dict[str, Any]:
     portfolio = get_owned_portfolio(db, portfolio_id, user_id)
     _, lots = realize_portfolio(db, portfolio_id, portfolio.base_currency.value)
-    return {"baseCurrency": portfolio.base_currency, "lots": lots}
+    trades = db.scalars(select(Transaction).where(Transaction.portfolio_id == portfolio_id)).all()
+    _, timing = _timing_report(db, list(trades))
+    return {"baseCurrency": portfolio.base_currency, "lots": lots, "timing": timing}

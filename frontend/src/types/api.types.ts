@@ -235,6 +235,12 @@ export type Transaction = {
     realizedPnLPct: number | null;
     realizedPnLBase: number | null;
     closedPosition: boolean;
+    timing?: {sameDay: number | null; sessions5: number | null; sessions20: number | null};
+};
+
+export type TimingSummary = {
+    note: string;
+    rows: {side: "BUY" | "SELL"; horizon: "sameDay" | "sessions5" | "sessions20"; n: number; meanBps: number | null; medianBps: number | null}[];
 };
 
 export type ClosedLot = {
@@ -253,6 +259,7 @@ export type ClosedLot = {
 export type ClosedLotsResponse = {
     baseCurrency: Currency;
     lots: ClosedLot[];
+    timing?: TimingSummary;
 };
 
 export type TransactionListResponse = {
@@ -263,6 +270,7 @@ export type TransactionListResponse = {
         total: number;
         totalPages: number;
     };
+    timing?: TimingSummary;
 };
 
 export type IvSurfacePoint = {
