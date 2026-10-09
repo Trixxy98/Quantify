@@ -82,6 +82,65 @@ def correlation_matrix(cov: Sequence[Sequence[float]]) -> list[list[float]]:
     return out
 
 
+def erc_weights(cov: Sequence[Sequence[float]], iterations: int = 2000) -> list[float] | None:
+    """Long-only fully invested weights with equal component contribution to volatility.
+
+    Each step moves halfway toward the Spinu update, so a tiny or negative risk share
+    raises the weight instead of dropping the name to zero.
+    """
+    n = len(cov)
+    if n == 0:
+        return []
+    if any(len(row) != n for row in cov):
+        return None
+    if n == 1:
+        return [1.0]
+    weights = [1 / n] * n
+    budget = 1 / n
+    for _ in range(iterations):
+        parts = portfolio_risk(weights, cov)
+        if parts["sigma"] <= 0:
+            return weights
+        if max(parts["share"]) - min(parts["share"]) < 1e-8:
+            return weights
+        nxt = []
+        for i in range(n):
+            share = parts["share"][i]
+            step = weights[i] * 1.25 if share <= 1e-12 else weights[i] * (budget / share) ** 0.5
+            nxt.append(max(step, 0.0))
+        total = sum(nxt)
+        if total <= 0:
+            return None
+        weights = [value / total for value in nxt]
+    return weights
+
+
+def constant_correlation_shrink(columns: Sequence[Sequence[float]]) -> tuple[list[list[float]], float]:
+    """Ledoit–Wolf constant-correlation target. The intensity is clipped to [0, 1]."""
+    cov = sample_covariance_matrix(columns)
+    n = len(cov)
+    length = len(columns[0]) if columns else 0
+    std = [math.sqrt(max(cov[i][i], 0)) for i in range(n)]
+    pairs = [cov[i][j] / (std[i] * std[j]) for i in range(n) for j in range(i + 1, n) if std[i] > 0 and std[j] > 0]
+    rho = max(-0.99, min(0.99, sum(pairs) / len(pairs))) if pairs else 0.0
+    target = [[cov[i][i] if i == j else rho * std[i] * std[j] for j in range(n)] for i in range(n)]
+    if length < 3 or n == 0:
+        return cov, 0.0
+    means = [sum(column) / len(column) for column in columns]
+    noise = 0.0
+    for i in range(n):
+        for j in range(n):
+            acc = 0.0
+            for k in range(length):
+                dev = (columns[i][k] - means[i]) * (columns[j][k] - means[j]) - cov[i][j]
+                acc += dev * dev
+            noise += acc / (length * (length - 1))
+    gap = sum((cov[i][j] - target[i][j]) ** 2 for i in range(n) for j in range(n))
+    intensity = 0.0 if gap <= 0 else max(0.0, min(1.0, noise / gap))
+    shrunk = [[(1 - intensity) * cov[i][j] + intensity * target[i][j] for j in range(n)] for i in range(n)]
+    return shrunk, intensity
+
+
 def portfolio_risk(weights: Sequence[float], cov: Sequence[Sequence[float]]) -> dict[str, Any]:
     """Component contributions sum to portfolio sigma. Shares sum to 1."""
     n = len(weights)

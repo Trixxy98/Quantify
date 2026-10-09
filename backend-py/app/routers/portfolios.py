@@ -91,6 +91,14 @@ def risk(portfolio_id: str, request: Request, db: Db, user_id: UserId) -> Any:
     return get_risk(db, portfolio_id, user_id, query.range, query.window)
 
 
+@router.get("/{portfolio_id}/erc")
+def erc(portfolio_id: str, request: Request, db: Db, user_id: UserId) -> Any:
+    from app.services.risk import get_risk
+
+    query = _range(request)
+    return get_risk(db, portfolio_id, user_id, query.range, query.window).get("erc")
+
+
 @router.get("/{portfolio_id}/factors")
 def factors(portfolio_id: str, request: Request, db: Db, user_id: UserId) -> Any:
     from app.services.factors import get_factor_exposure

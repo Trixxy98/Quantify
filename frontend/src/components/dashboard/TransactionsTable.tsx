@@ -49,6 +49,9 @@ export function TransactionsTable({ portfolioId, editingId, onEdit }: Props) {
               <th className="pb-2 font-medium text-right">Price</th>
               <th className="pb-2 font-medium text-right">Fee</th>
               <th className="pb-2 font-medium text-right">Realized</th>
+              <th className="pb-2 font-medium text-right">vs close</th>
+              <th className="pb-2 font-medium text-right">+5</th>
+              <th className="pb-2 font-medium text-right">+20</th>
               <th className="pb-2 font-medium" />
             </tr>
           </thead>
@@ -79,6 +82,14 @@ export function TransactionsTable({ portfolioId, editingId, onEdit }: Props) {
                     "—"
                   )}
                 </td>
+                {(["sameDay", "sessions5", "sessions20"] as const).map((horizon) => {
+                  const value = tx.timing?.[horizon];
+                  return (
+                    <td key={horizon} className={`py-2 text-right tabular-nums ${value == null ? "text-[var(--color-text-muted)]" : toneClass(value)}`}>
+                      {value == null ? "—" : `${value > 0 ? "+" : ""}${value.toFixed(0)}`}
+                    </td>
+                  );
+                })}
                 <td className="py-2 text-right whitespace-nowrap">
                   <button
                     type="button"

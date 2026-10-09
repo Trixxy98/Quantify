@@ -259,6 +259,21 @@ class AgentForecast(Base):
     run: Mapped[AgentRun] = relationship(back_populates="forecasts")
 
 
+class AgentDecision(Base):
+    """Append-only one-month book. A later pass does not rewrite a month that already has rows."""
+
+    __tablename__ = "AgentDecision"
+    __table_args__ = (Index("AgentDecision_asOf_symbol_key", "asOf", "symbol", unique=True),)
+    id: Mapped[str] = _id()
+    as_of: Mapped[DateType] = mapped_column("asOf", Date)
+    symbol: Mapped[str] = mapped_column(Text)
+    weight: Mapped[Decimal] = mapped_column(Numeric(18, 10))
+    action: Mapped[str] = mapped_column(Text)
+    reason: Mapped[str] = mapped_column(Text)
+    rules: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = _created()
+
+
 class NewsHeadline(Base):
     __tablename__ = "NewsHeadline"
     __table_args__ = (

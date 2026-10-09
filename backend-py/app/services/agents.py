@@ -12,11 +12,25 @@ from sqlalchemy.orm import Session
 from app.db import SessionLocal
 from app.jobs.market_session import latest_session
 from app.jobs.state import finish_agents, try_start_agents
-from app.models import AgentForecast, AgentRun, BenchmarkPrice, DailyPrice, FactorReturn, NewsHeadline, new_id, table_of
+from app.models import (
+    AgentDecision,
+    AgentForecast,
+    AgentRun,
+    BenchmarkPrice,
+    DailyPrice,
+    FactorReturn,
+    NewsHeadline,
+    new_id,
+    table_of,
+)
+from app.research.agents.decision import decide_from_outputs, evaluate, forecast_correlation
+from app.research.agents.monthly import shift_month
 from app.research.agents.orchestrator import AGENTS, AgentRunState, agents_due, completed_month_end, run_agent_set
 from app.research.agents.scoreboard import score_agent
 from app.research.agents.technical import MIN_TRAIN_MONTHS
 from app.research.agents.types import AgentInput, SymbolSeries
+from app.research.french import FACTOR_NAMES
+from app.research.ols import CollinearError, ols
 from app.services.corporate_actions import load_dividends
 from app.services.earnings import load_earnings_events, record_earnings
 from app.services.events import load_macro
@@ -31,6 +45,11 @@ HISTORY_FROM = datetime(2015, 1, 1)
 AGENT_IN_FLIGHT = timedelta(hours=1)
 REFRESH_WORKERS = 3
 INDEX_VIEW_SYMBOLS = ("SPY",)
+DECISION_AGENTS = [
+    agent
+    for agent in AGENTS
+    if agent.horizon == "1m" and (agent.target == "returnScore" or (agent.name == "risk" and agent.target in ("vol", "probDrawdown")))
+]
 
 AGENT_INFO = {
     "technical": {
@@ -48,6 +67,10 @@ AGENT_INFO = {
     "risk": {
         "label": "Risk",
         "description": "HAR next-month vol per name, plus P(market drawdown ≤ −5% peak-to-trough) on SPY/^GSPC.",
+    },
+    "sentiment": {
+        "label": "Sentiment",
+        "description": "Net tone of recorded headlines. No decision weight until 12 scored months exist.",
     },
 }
 
@@ -142,7 +165,24 @@ def load_agent_input(db: Session, as_of: str, symbols: list[str]) -> AgentInput:
                 level=[point["level"] for point in build_level([{"date": d, "close": c} for d, c in zip(dates, close, strict=True)], income)],
             )
         )
-    return AgentInput(as_of=as_of, series=series, factors=_load_factors(db, as_of), events=_load_events(db, as_of, symbols))
+    return AgentInput(
+        as_of=as_of,
+        series=series,
+        factors=_load_factors(db, as_of),
+        events=_load_events(db, as_of, symbols),
+        headlines=_load_headlines(db, as_of, symbols),
+    )
+
+
+def _load_headlines(db: Session, as_of: str, symbols: list[str]) -> list[dict[str, str]]:
+    """Stored titles published on or before as_of. The scoreboard does not call Yahoo."""
+    cutoff = datetime.fromisoformat(as_of).replace(hour=23, minute=59, second=59)
+    rows = db.scalars(
+        select(NewsHeadline)
+        .where(NewsHeadline.symbol.in_(symbols), NewsHeadline.published <= cutoff)
+        .order_by(NewsHeadline.published)
+    ).all()
+    return [{"symbol": row.symbol, "published": date_key(row.published), "title": row.title} for row in rows]
 
 
 def _load_factors(db: Session, as_of: str) -> dict[str, dict[str, float]]:
@@ -193,6 +233,7 @@ def run_agents(trigger: str, now: datetime | None = None) -> dict[str, Any]:
             ]
             due = agents_due(AGENTS, previous, now, AGENT_IN_FLIGHT)
             if not due:
+                _ensure_decisions(db, as_of_date)
                 return {"ran": False, "asOf": as_of, "reason": f"every agent already ran for {as_of}"}
 
             runs = [AgentRun(agent=agent.name, as_of=as_of_date, trigger=trigger, model_version=agent.version) for agent in due]
@@ -243,6 +284,7 @@ def run_agents(trigger: str, now: datetime | None = None) -> dict[str, Any]:
                 run.rows = len(rows)
                 db.commit()
                 summary.append({"agent": agent.name, "ok": True, "rows": inserted, "error": None})
+            _ensure_decisions(db, as_of_date, data)
             return {"ran": True, "asOf": as_of, "refreshFailed": refresh_failed, "agents": summary}
     finally:
         finish_agents()
@@ -299,6 +341,133 @@ def _recorded_forecasts(db: Session, agent: str, target: str, horizon: str) -> d
     }
 
 
+def _ensure_decisions(db: Session, as_of: date, data: AgentInput | None = None) -> None:
+    """Write the month's book once. A later pass leaves the rows alone."""
+    existing = db.scalar(select(func.count()).select_from(AgentDecision).where(AgentDecision.as_of == as_of)) or 0
+    if existing:
+        return
+    if data is None:
+        data = load_agent_input(db, date_key(as_of), agent_universe(db))
+    results = run_agent_set(DECISION_AGENTS, data)
+    decision = decide_from_outputs([result.output for result in results if result.ok and result.output])
+    if not decision.rows:
+        return
+    table = table_of(AgentDecision)
+    db.execute(
+        insert(table)
+        .values(
+            [
+                {
+                    "id": new_id(),
+                    "asOf": as_of,
+                    "symbol": row.symbol,
+                    "weight": row.weight,
+                    "action": row.action,
+                    "reason": row.reason,
+                    "rules": json.dumps(row.rules),
+                    "createdAt": utcnow(),
+                }
+                for row in decision.rows
+            ]
+        )
+        .on_conflict_do_nothing()
+    )
+    db.commit()
+
+
+def _decision_view(db: Session, results: list[Any], as_of: str | None) -> dict[str, Any]:
+    outputs = [result.output for result in results if result.ok and result.output]
+    decision = decide_from_outputs(outputs)
+    stored_on = date.fromisoformat(as_of) if as_of else None
+    stored = (
+        db.scalars(select(AgentDecision).where(AgentDecision.as_of == stored_on).order_by(AgentDecision.weight.desc())).all()
+        if stored_on
+        else []
+    )
+    if stored:
+        rows = [
+            {"symbol": row.symbol, "weight": float(row.weight), "action": row.action, "reason": row.reason, "rules": json.loads(row.rules)}
+            for row in stored
+        ]
+        recorded = True
+    else:
+        rows = [
+            {"symbol": row.symbol, "weight": row.weight, "action": row.action, "reason": row.reason, "rules": row.rules}
+            for row in decision.rows
+        ]
+        recorded = False
+    return {"month": decision.month, "recorded": recorded, "weights": decision.weights, "rows": rows, "notes": decision.notes}
+
+
+def _benchmark_by_month(db: Session) -> dict[str, float]:
+    """Month-end to next month-end total return of ^SP500TR, keyed by the start month."""
+    rows = db.execute(select(BenchmarkPrice.date, BenchmarkPrice.close).where(BenchmarkPrice.symbol == "^SP500TR").order_by(BenchmarkPrice.date)).all()
+    last: dict[str, float] = {}
+    for row in rows:
+        last[date_key(row.date)[:7]] = float(row.close)
+    keys = sorted(last)
+    out: dict[str, float] = {}
+    for prev, month in zip(keys, keys[1:], strict=False):
+        if last[prev] > 0:
+            out[prev] = last[month] / last[prev] - 1
+    return out
+
+
+def _decision_alpha(db: Session, points: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Monthly FF5+Mom alpha. The book's return for a forecast month is earned the month after."""
+    if len(points) <= len(FACTOR_NAMES) + 1:
+        return None
+    levels = [float(point["strategy"]) for point in points]
+    monthly = {str(point["month"]): levels[i] / (100.0 if i == 0 else levels[i - 1]) - 1 for i, point in enumerate(points)}
+    holding = {shift_month(month, 1): month for month in monthly}
+    start = date.fromisoformat(min(holding) + "-01")
+    end = date.fromisoformat(shift_month(max(holding), 1) + "-01") - timedelta(days=1)
+    rows = db.execute(
+        select(FactorReturn.date, FactorReturn.factor, FactorReturn.value)
+        .where(FactorReturn.date >= start, FactorReturn.date <= end)
+        .order_by(FactorReturn.date)
+    ).all()
+    growth: dict[str, dict[str, float]] = {}
+    for row in rows:
+        month = date_key(row.date)[:7]
+        if month not in holding:
+            continue
+        bucket = growth.setdefault(month, {})
+        bucket[row.factor] = bucket.get(row.factor, 1.0) * (1 + float(row.value))
+    y: list[float] = []
+    x: list[list[float]] = []
+    for month, forecast_month in sorted(holding.items()):
+        factors = growth.get(month)
+        if not factors or "RF" not in factors or any(name not in factors for name in FACTOR_NAMES):
+            continue
+        y.append(monthly[forecast_month] - (factors["RF"] - 1))
+        x.append([factors[name] - 1 for name in FACTOR_NAMES])
+    if len(y) <= len(FACTOR_NAMES) + 1:
+        return None
+    try:
+        fit = ols(y, x, 3)
+    except (CollinearError, ValueError):
+        return None
+    return {"annualized": fit["beta"][0] * 12, "tStat": fit["tStat"][0], "n": fit["n"]}
+
+
+def _evaluation_view(db: Session, results: list[Any]) -> dict[str, Any]:
+    outputs = [result.output for result in results if result.ok and result.output]
+    curve = evaluate(outputs, _benchmark_by_month(db))
+    points = curve["equity"]
+    assert isinstance(points, list)
+    return {
+        "equity": points,
+        "bestAgent": curve["bestAgent"],
+        "months": curve["months"],
+        "alpha": _decision_alpha(db, points),
+        "notes": [
+            "Indexed to 100. Costs are 5 bps commission plus 5 bps slippage on the weight change. Cash earns nothing.",
+            "Buy and hold and equal weight use the same names. The best agent is the return model with the highest positive trailing IC, long its top third.",
+        ],
+    }
+
+
 def _headline_progress(db: Session) -> dict[str, Any]:
     total = db.scalar(select(func.count()).select_from(NewsHeadline)) or 0
     symbols = db.scalar(select(func.count(func.distinct(NewsHeadline.symbol)))) or 0
@@ -329,7 +498,7 @@ def get_agents_overview(db: Session, now: datetime | None = None) -> dict[str, A
         "With about 70 test months, a mean IC needs to be roughly 0.035 or more to clear t = 2. Monthly t-stats use Newey–West (3 lags); intervals are the 5th–95th percentile of 2,000 stationary bootstrap resamples in 3-month blocks.",
         "The scoreboard is a backtest recomputed from stored prices. Recorded forecasts are the live record, written at each month end before the outcome is known, and are never edited.",
         "G2 adds Quant, Event and Risk drawdown probability. FOMC and CPI dates come from macroEvents.json. Earnings dates are the stored Yahoo filing dates (filled by the daily sync); the scoreboard does not call Yahoo. The same models also report a five-session horizon; decisions stay on the one-month horizon. HAR vol stays one month.",
-        "Headlines are recorded forward for the Sentiment agent (G3). It gets no weight until 12 scored months exist.",
+        "The decision engine combines the one-month Technical, Quant, Event and Sentiment ranks. Sentiment has no weight until 12 scored months exist. Five-session forecasts are not used.",
     ]
     if data:
         present = {series.symbol for series in data.series}
@@ -365,5 +534,8 @@ def get_agents_overview(db: Session, now: datetime | None = None) -> dict[str, A
         "scoreboard": [score_agent(result.output) for result in results if result.ok and result.output],
         "recorded": [_recorded_forecasts(db, agent.name, agent.target, agent.horizon) for agent in AGENTS],
         "headlines": _headline_progress(db),
+        "decisions": _decision_view(db, results, as_of),
+        "evaluation": _evaluation_view(db, results),
+        "correlation": forecast_correlation([result.output for result in results if result.ok and result.output]),
         "notes": notes,
     }

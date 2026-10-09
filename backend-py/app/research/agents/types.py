@@ -2,7 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
-AgentName = Literal["technical", "risk", "quant", "event"]
+AgentName = Literal["technical", "risk", "quant", "event", "sentiment"]
 AgentTarget = Literal["returnScore", "vol", "probBeatMedian", "volUplift", "probDrawdown"]
 AgentHorizon = Literal["1m", "5d"]
 
@@ -27,6 +27,7 @@ class AgentInput:
     series: list[SymbolSeries]
     factors: dict[str, dict[str, float]] | None = None
     events: list[dict] | None = None
+    headlines: list[dict] | None = None
 
 
 @dataclass

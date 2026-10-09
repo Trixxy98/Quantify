@@ -83,6 +83,40 @@ export default function RiskPage() {
             </table>
         </div>
 
+        {data?.erc && (
+            <div className="rounded-xl bg-[var(--color-surface)] p-5 overflow-x-auto">
+                <h2 className="text-sm text-[var(--color-text-muted)] mb-1">Equal risk contribution</h2>
+                <p className="text-xs text-[var(--color-text-muted)] mb-4">{data.erc.note}</p>
+                <p className="text-xs text-[var(--color-text-muted)] mb-4">
+                    Volatility now {formatPctAbs(data.erc.currentVolatility)}. Sample covariance {formatPctAbs(data.erc.sample.volatility)}. Constant-correlation shrinkage {formatPctAbs(data.erc.shrunk.volatility)} (intensity {formatNumber(data.erc.shrunk.intensity)}).
+                </p>
+                <table className="w-full text-sm">
+                    <thead className="text-left text-[var(--color-text-muted)]">
+                        <tr>
+                            <th className="pb-2 font-medium">Symbol</th>
+                            <th className="pb-2 font-medium text-right">Now</th>
+                            <th className="pb-2 font-medium text-right">Sample</th>
+                            <th className="pb-2 font-medium text-right">Shares</th>
+                            <th className="pb-2 font-medium text-right">Shrunk</th>
+                            <th className="pb-2 font-medium text-right">Shares</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {data.erc.trades.map((row) => (
+                            <tr key={row.symbol}>
+                                <td className="py-2 font-medium">{row.symbol}</td>
+                                <td className="py-2 text-right">{formatPctAbs(row.currentWeight)}</td>
+                                <td className="py-2 text-right">{formatPctAbs(row.sampleWeight)}</td>
+                                <td className="py-2 text-right">{row.sampleShares == null ? "—" : formatNumber(row.sampleShares, 0)}</td>
+                                <td className="py-2 text-right">{formatPctAbs(row.shrunkWeight)}</td>
+                                <td className="py-2 text-right">{row.shrunkShares == null ? "—" : formatNumber(row.shrunkShares, 0)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        )}
+
         {data && data.correlation.symbols.length > 1 && (
             <div className="rounded-xl bg-[var(--color-surface)] p-5 overflow-x-auto">
                 <h2 className="text-sm text-[var(--color-text-muted)] mb-4">Correlation</h2>

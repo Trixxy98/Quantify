@@ -180,6 +180,20 @@ export type PortfolioRisk = {
     };
     names: RiskName[];
     correlation: {symbols: string[]; matrix: number[][]};
+    erc: {
+        currentVolatility: number;
+        sample: {weights: number[]; volatility: number; intensity: number};
+        shrunk: {weights: number[]; volatility: number; intensity: number};
+        trades: {
+            symbol: string;
+            currentWeight: number;
+            sampleWeight: number;
+            shrunkWeight: number;
+            sampleShares: number | null;
+            shrunkShares: number | null;
+        }[];
+        note: string;
+    } | null;
     underwater: {date: string; drawdown: number}[];
     rolling: {date: string; vol: number; beta: number}[];
     drawdowns: {
@@ -235,6 +249,12 @@ export type Transaction = {
     realizedPnLPct: number | null;
     realizedPnLBase: number | null;
     closedPosition: boolean;
+    timing?: {sameDay: number | null; sessions5: number | null; sessions20: number | null};
+};
+
+export type TimingSummary = {
+    note: string;
+    rows: {side: "BUY" | "SELL"; horizon: "sameDay" | "sessions5" | "sessions20"; n: number; meanBps: number | null; medianBps: number | null}[];
 };
 
 export type ClosedLot = {
@@ -253,6 +273,7 @@ export type ClosedLot = {
 export type ClosedLotsResponse = {
     baseCurrency: Currency;
     lots: ClosedLot[];
+    timing?: TimingSummary;
 };
 
 export type TransactionListResponse = {
@@ -263,6 +284,7 @@ export type TransactionListResponse = {
         total: number;
         totalPages: number;
     };
+    timing?: TimingSummary;
 };
 
 export type IvSurfacePoint = {
@@ -527,7 +549,7 @@ export type DataHealth = {
     notes: string[];
 };
 
-export type AgentName = "technical" | "risk" | "quant" | "event";
+export type AgentName = "technical" | "risk" | "quant" | "event" | "sentiment";
 
 export type AgentRunView = {
     agent: AgentName;
@@ -587,5 +609,30 @@ export type AgentsOverview = {
     scoreboard: AgentScore[];
     recorded: RecordedForecasts[];
     headlines: {total: number; symbols: number; since: string | null; latest: string | null};
+    decisions: {
+        month: string | null;
+        recorded: boolean;
+        weights: Record<string, number>;
+        rows: {symbol: string; weight: number; action: string; reason: string; rules: string[]}[];
+        notes: string[];
+    };
+    evaluation: {
+        equity: {
+            month: string;
+            strategy: number;
+            buyHold: number;
+            equalWeight: number;
+            bestAgent: number;
+            benchmark: number | null;
+        }[];
+        bestAgent: string | null;
+        months: number;
+        alpha: {annualized: number; tStat: number; n: number} | null;
+        notes: string[];
+    };
+    correlation: {
+        agents: string[];
+        pairs: {left: string; right: string; mean: number | null; latest: number | null; latestMonth: string | null; months: number}[];
+    };
     notes: string[];
 };

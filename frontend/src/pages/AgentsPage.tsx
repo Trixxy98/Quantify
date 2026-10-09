@@ -1,5 +1,8 @@
 import {useMemo, useState} from "react";
 import {AgentRunsCard} from "../components/agents/AgentRunsCard";
+import {DecisionEquityChart} from "../components/agents/DecisionEquityChart";
+import {ForecastCorrelation} from "../components/agents/ForecastCorrelation";
+import {DecisionsCard} from "../components/agents/DecisionsCard";
 import {RecordedForecastsCard} from "../components/agents/RecordedForecastsCard";
 import {ScoreboardTable} from "../components/agents/ScoreboardTable";
 import {MetricCard} from "../components/dashboard/MetricCard";
@@ -42,6 +45,11 @@ const RECORDED_COPY: Record<string, {title: string; caption: string; format: "sc
         caption: "Chance of a −5% peak-to-trough on SPY or ^GSPC.",
         format: "prob",
     },
+    "sentiment|returnScore": {
+        title: "Sentiment tone",
+        caption: "Net tone of recorded headlines. No weight until 12 scored months.",
+        format: "score",
+    },
 };
 
 const FAMILIES = [
@@ -50,6 +58,7 @@ const FAMILIES = [
     {id: "quant", label: "Quant"},
     {id: "event", label: "Event"},
     {id: "risk", label: "Risk"},
+    {id: "sentiment", label: "Sentiment"},
 ] as const;
 
 type Family = (typeof FAMILIES)[number]["id"];
@@ -148,6 +157,10 @@ export default function AgentsPage() {
                     isLoading={isLoading}
                 />
             </section>
+
+            {data && <DecisionsCard decisions={data.decisions} />}
+            {data && <DecisionEquityChart evaluation={data.evaluation} />}
+            {data && <ForecastCorrelation correlation={data.correlation} />}
 
             {view && view.families.length > 0 && (
                 <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
