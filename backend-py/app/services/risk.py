@@ -17,8 +17,10 @@ from app.services.metrics import (
 )
 from app.services.risk_math import (
     annualized_vol_from_daily_variances,
+    constant_correlation_shrink,
     correlation_matrix,
     drawdown_episodes,
+    erc_weights,
     expected_shortfall,
     garman_klass_daily,
     kupiec_statistic,
@@ -129,15 +131,68 @@ def get_risk(db: Session, portfolio_id: str, user_id: str, range_: str, window: 
         },
         "names": names["rows"],
         "correlation": names["correlation"],
+        "erc": names.get("erc"),
         "underwater": underwater,
         "rolling": rolling_vol_beta(aligned_port, bench_returns, bench_dates, window),
         "drawdowns": drawdown_episodes(twr),
     }
 
 
+def _book(cov: list[list[float]]) -> dict[str, Any] | None:
+    solved = erc_weights(cov)
+    if solved is None:
+        return None
+    parts = portfolio_risk(solved, cov)
+    return {"weights": solved, "volatility": parts["sigma"] * ANN}
+
+
+def _shares(mark: OpenPositionMark, current: float, target: float, total_value: float) -> int | None:
+    if mark.last_price is None or mark.last_price <= 0:
+        return None
+    return round((target - current) * total_value / mark.last_price)
+
+
+def _erc(
+    symbols: list[str],
+    current: list[float],
+    columns: list[list[float]],
+    cov: list[list[float]],
+    marks: dict[str, OpenPositionMark],
+    total_value: float,
+    enough: bool,
+) -> dict[str, Any] | None:
+    if not enough:
+        return None
+    sample = _book(cov)
+    shrunk_cov, intensity = constant_correlation_shrink(columns)
+    shrunk = _book(shrunk_cov)
+    if sample is None or shrunk is None:
+        return None
+    current_vol = portfolio_risk(current, cov)["sigma"] * ANN
+    trades = []
+    for i, symbol in enumerate(symbols):
+        trades.append(
+            {
+                "symbol": symbol,
+                "currentWeight": current[i],
+                "sampleWeight": sample["weights"][i],
+                "shrunkWeight": shrunk["weights"][i],
+                "sampleShares": _shares(marks[symbol], current[i], sample["weights"][i], total_value),
+                "shrunkShares": _shares(marks[symbol], current[i], shrunk["weights"][i], total_value),
+            }
+        )
+    return {
+        "currentVolatility": current_vol,
+        "sample": {**sample, "intensity": 0},
+        "shrunk": {**shrunk, "intensity": intensity},
+        "trades": trades,
+        "note": "Long-only, fully invested. Share counts are the rounded difference in market value at the last price. Shrinking pulls the covariance toward a constant correlation.",
+    }
+
+
 def _name_risk(db: Session, priced: list[OpenPositionMark], total_value: float, range_: str, notes: list[str]) -> dict[str, Any]:
     if not priced or total_value <= 0:
-        return {"rows": [], "correlation": {"symbols": [], "matrix": []}}
+        return {"rows": [], "correlation": {"symbols": [], "matrix": []}, "erc": None}
 
     symbols = [mark.symbol for mark in priced]
     start = resolve_range_start(range_)
@@ -243,4 +298,4 @@ def _name_risk(db: Session, priced: list[OpenPositionMark], total_value: float, 
             }
         )
     rows.sort(key=lambda row: row["riskShare"] if row["riskShare"] is not None else -1, reverse=True)
-    return {"rows": rows, "correlation": {"symbols": usable, "matrix": corr}}
+    return {"rows": rows, "correlation": {"symbols": usable, "matrix": corr}, "erc": _erc(usable, scaled, columns, cov, mark_by_symbol, total_value, enough)}

@@ -180,6 +180,20 @@ export type PortfolioRisk = {
     };
     names: RiskName[];
     correlation: {symbols: string[]; matrix: number[][]};
+    erc: {
+        currentVolatility: number;
+        sample: {weights: number[]; volatility: number; intensity: number};
+        shrunk: {weights: number[]; volatility: number; intensity: number};
+        trades: {
+            symbol: string;
+            currentWeight: number;
+            sampleWeight: number;
+            shrunkWeight: number;
+            sampleShares: number | null;
+            shrunkShares: number | null;
+        }[];
+        note: string;
+    } | null;
     underwater: {date: string; drawdown: number}[];
     rolling: {date: string; vol: number; beta: number}[];
     drawdowns: {
