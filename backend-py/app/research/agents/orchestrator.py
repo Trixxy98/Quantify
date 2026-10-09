@@ -8,6 +8,7 @@ from app.research.agents.event import event_5d_agent, event_agent, event_vol_5d_
 from app.research.agents.quant import quant_5d_agent, quant_agent, quant_prob_5d_agent, quant_prob_agent
 from app.research.agents.risk_drawdown import risk_drawdown_5d_agent, risk_drawdown_agent
 from app.research.agents.risk_vol import risk_vol_agent
+from app.research.agents.sentiment import sentiment_agent
 from app.research.agents.technical import technical_5d_agent, technical_agent
 from app.research.agents.types import Agent, AgentInput, AgentOutput, AgentPrediction
 
@@ -26,6 +27,7 @@ AGENTS: list[Agent] = [
     risk_vol_agent,
     risk_drawdown_agent,
     risk_drawdown_5d_agent,
+    sentiment_agent,
 ]
 
 

@@ -14,7 +14,7 @@ TRAIL_MONTHS = 12
 MIN_NAMES = 5
 SHRINK = 0.5
 DRAWDOWN_PERCENTILE = 0.80
-RETURN_AGENTS = ("technical", "quant", "event")
+RETURN_AGENTS = ("technical", "quant", "event", "sentiment")
 
 
 @dataclass(frozen=True)

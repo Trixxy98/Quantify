@@ -126,7 +126,7 @@ def test_five_session_quant_is_scored_on_a_shorter_window() -> None:
     assert sample.realized == pytest.approx(next_n_return(series, index))
     versions = {agent.version for agent in AGENTS}
     assert quant_5d_agent.version in versions
-    assert len(AGENTS) == 13
+    assert len(AGENTS) == 14
 
 
 def test_dates_ahead_is_the_next_five_sessions() -> None:

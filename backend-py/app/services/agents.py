@@ -68,6 +68,10 @@ AGENT_INFO = {
         "label": "Risk",
         "description": "HAR next-month vol per name, plus P(market drawdown ≤ −5% peak-to-trough) on SPY/^GSPC.",
     },
+    "sentiment": {
+        "label": "Sentiment",
+        "description": "Net tone of recorded headlines. No decision weight until 12 scored months exist.",
+    },
 }
 
 
@@ -161,7 +165,24 @@ def load_agent_input(db: Session, as_of: str, symbols: list[str]) -> AgentInput:
                 level=[point["level"] for point in build_level([{"date": d, "close": c} for d, c in zip(dates, close, strict=True)], income)],
             )
         )
-    return AgentInput(as_of=as_of, series=series, factors=_load_factors(db, as_of), events=_load_events(db, as_of, symbols))
+    return AgentInput(
+        as_of=as_of,
+        series=series,
+        factors=_load_factors(db, as_of),
+        events=_load_events(db, as_of, symbols),
+        headlines=_load_headlines(db, as_of, symbols),
+    )
+
+
+def _load_headlines(db: Session, as_of: str, symbols: list[str]) -> list[dict[str, str]]:
+    """Stored titles published on or before as_of. The scoreboard does not call Yahoo."""
+    cutoff = datetime.fromisoformat(as_of).replace(hour=23, minute=59, second=59)
+    rows = db.scalars(
+        select(NewsHeadline)
+        .where(NewsHeadline.symbol.in_(symbols), NewsHeadline.published <= cutoff)
+        .order_by(NewsHeadline.published)
+    ).all()
+    return [{"symbol": row.symbol, "published": date_key(row.published), "title": row.title} for row in rows]
 
 
 def _load_factors(db: Session, as_of: str) -> dict[str, dict[str, float]]:
@@ -477,7 +498,7 @@ def get_agents_overview(db: Session, now: datetime | None = None) -> dict[str, A
         "With about 70 test months, a mean IC needs to be roughly 0.035 or more to clear t = 2. Monthly t-stats use Newey–West (3 lags); intervals are the 5th–95th percentile of 2,000 stationary bootstrap resamples in 3-month blocks.",
         "The scoreboard is a backtest recomputed from stored prices. Recorded forecasts are the live record, written at each month end before the outcome is known, and are never edited.",
         "G2 adds Quant, Event and Risk drawdown probability. FOMC and CPI dates come from macroEvents.json. Earnings dates are the stored Yahoo filing dates (filled by the daily sync); the scoreboard does not call Yahoo. The same models also report a five-session horizon; decisions stay on the one-month horizon. HAR vol stays one month.",
-        "The decision engine combines the one-month Technical, Quant and Event ranks. Sentiment has no weight until 12 scored months exist. Five-session forecasts are not used.",
+        "The decision engine combines the one-month Technical, Quant, Event and Sentiment ranks. Sentiment has no weight until 12 scored months exist. Five-session forecasts are not used.",
     ]
     if data:
         present = {series.symbol for series in data.series}

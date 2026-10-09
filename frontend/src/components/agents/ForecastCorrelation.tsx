@@ -1,7 +1,7 @@
 import type {AgentsOverview} from "../../types/api.types";
 import {formatNumber} from "../../utils/format";
 
-const LABEL: Record<string, string> = {technical: "Technical", quant: "Quant", event: "Event"};
+const LABEL: Record<string, string> = {technical: "Technical", quant: "Quant", event: "Event", sentiment: "Sentiment"};
 
 function cell(value: number | null): string {
     return value == null ? "—" : formatNumber(value, 2);

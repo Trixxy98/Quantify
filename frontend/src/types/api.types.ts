@@ -527,7 +527,7 @@ export type DataHealth = {
     notes: string[];
 };
 
-export type AgentName = "technical" | "risk" | "quant" | "event";
+export type AgentName = "technical" | "risk" | "quant" | "event" | "sentiment";
 
 export type AgentRunView = {
     agent: AgentName;
