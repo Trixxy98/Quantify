@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.risk_math import constant_correlation_shrink, erc_weights, portfolio_risk
+from app.services.risk_math import constant_correlation_shrink, erc_weights, minimum_variance_weights, portfolio_risk
 
 
 def test_two_assets_match_the_inverse_volatility_weights():
@@ -44,3 +44,21 @@ def test_shrinkage_intensity_stays_inside_zero_and_one():
     ]
     _, intensity = constant_correlation_shrink(columns)
     assert 0 <= intensity <= 1
+
+
+def test_minimum_variance_is_inverse_variance_when_uncorrelated():
+    cov = [[0.04, 0.0], [0.0, 0.01]]
+    weights = minimum_variance_weights(cov)
+    assert weights is not None
+    assert weights[0] == pytest.approx(0.2)
+    assert weights[1] == pytest.approx(0.8)
+    assert portfolio_risk(weights, cov)["sigma"] < portfolio_risk(erc_weights(cov), cov)["sigma"]
+
+
+def test_minimum_variance_matches_equal_weights_when_assets_match():
+    cov = [[0.04, 0.02, 0.02], [0.02, 0.04, 0.02], [0.02, 0.02, 0.04]]
+    weights = minimum_variance_weights(cov)
+    assert weights is not None
+    assert weights == [pytest.approx(1 / 3)] * 3
+    assert all(weight >= 0 for weight in weights)
+    assert sum(weights) == pytest.approx(1)

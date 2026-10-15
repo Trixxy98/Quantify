@@ -24,6 +24,7 @@ from app.services.risk_math import (
     expected_shortfall,
     garman_klass_daily,
     kupiec_statistic,
+    minimum_variance_weights,
     portfolio_risk,
     quantile,
     rolling_vol_beta,
@@ -168,6 +169,10 @@ def _erc(
     shrunk = _book(shrunk_cov)
     if sample is None or shrunk is None:
         return None
+    min_var = minimum_variance_weights(shrunk_cov)
+    if min_var is None:
+        return None
+    min_var_vol = portfolio_risk(min_var, shrunk_cov)["sigma"] * ANN
     current_vol = portfolio_risk(current, cov)["sigma"] * ANN
     trades = []
     for i, symbol in enumerate(symbols):
@@ -179,14 +184,17 @@ def _erc(
                 "shrunkWeight": shrunk["weights"][i],
                 "sampleShares": _shares(marks[symbol], current[i], sample["weights"][i], total_value),
                 "shrunkShares": _shares(marks[symbol], current[i], shrunk["weights"][i], total_value),
+                "minVarWeight": min_var[i],
+                "minVarShares": _shares(marks[symbol], current[i], min_var[i], total_value),
             }
         )
     return {
         "currentVolatility": current_vol,
         "sample": {**sample, "intensity": 0},
         "shrunk": {**shrunk, "intensity": intensity},
+        "minimumVariance": {"weights": min_var, "volatility": min_var_vol},
         "trades": trades,
-        "note": "Long-only, fully invested. Share counts are the rounded difference in market value at the last price. Shrinking pulls the covariance toward a constant correlation.",
+        "note": "Long-only and fully invested. Minimum variance is the left edge of the frontier on the shrunk covariance, shown beside equal risk contribution. Share counts are the rounded difference in market value at the last price.",
     }
 
 

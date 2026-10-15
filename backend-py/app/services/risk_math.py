@@ -1,6 +1,8 @@
 import math
 from collections.abc import Sequence
 from typing import Any
+import numpy as np 
+from scipy.optimize import minimize
 
 from app.services.stats import covariance, std_dev, variance
 
@@ -139,6 +141,38 @@ def constant_correlation_shrink(columns: Sequence[Sequence[float]]) -> tuple[lis
     intensity = 0.0 if gap <= 0 else max(0.0, min(1.0, noise / gap))
     shrunk = [[(1 - intensity) * cov[i][j] + intensity * target[i][j] for j in range(n)] for i in range(n)]
     return shrunk, intensity
+
+def minimum_variance_weights(cov: Sequence[Sequence[float]]) -> list[float] | None:
+    """Long-only fully invested minimum variance. The left edge of the frontier."""
+    n = len(cov)
+    if n == 0:
+        return []
+    if any(len(row) != n for row in cov):
+        return None
+    if n == 1:
+        return [1.0]
+    matrix = np.asarray(cov, dtype=float)
+
+    def objective(weights: np.ndarray) -> float:
+        return float(weights @ matrix @ weights)
+    
+    def gradient(weights: np.ndarray) -> np.ndarray:
+        return 2 * matrix @ weights
+
+    result = minimize(
+        objective,
+        np.full(n, 1 / n),
+        jac=gradient,
+        method="SLSQP",
+        bounds=[(0.0, 1.0)] * n,
+        constraints={"type": "eq", "fun": lambda weights: float(np.sum(weights) - 1)},
+        options={"maxiter": 200, "ftol": 1e-14},
+    )
+    if not result.success:
+        return None
+    raw = [max(0.0, float(value)) for value in result.x]
+    total = sum(raw) or 1.0
+    return [value / total for value in raw]
 
 
 def portfolio_risk(weights: Sequence[float], cov: Sequence[Sequence[float]]) -> dict[str, Any]:
