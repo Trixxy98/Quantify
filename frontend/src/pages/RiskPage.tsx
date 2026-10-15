@@ -88,7 +88,7 @@ export default function RiskPage() {
                 <h2 className="text-sm text-[var(--color-text-muted)] mb-1">Equal risk contribution</h2>
                 <p className="text-xs text-[var(--color-text-muted)] mb-4">{data.erc.note}</p>
                 <p className="text-xs text-[var(--color-text-muted)] mb-4">
-                    Volatility now {formatPctAbs(data.erc.currentVolatility)}. Sample covariance {formatPctAbs(data.erc.sample.volatility)}. Constant-correlation shrinkage {formatPctAbs(data.erc.shrunk.volatility)} (intensity {formatNumber(data.erc.shrunk.intensity)}).
+                    Volatility now {formatPctAbs(data.erc.currentVolatility)}. Sample covariance {formatPctAbs(data.erc.sample.volatility)}. Constant-correlation shrinkage {formatPctAbs(data.erc.shrunk.volatility)} (intensity {formatNumber(data.erc.shrunk.intensity)}) {" "}Minimum variance {formatPctAbs(data.erc.minimumVariance.volatility)}.
                 </p>
                 <table className="w-full text-sm">
                     <thead className="text-left text-[var(--color-text-muted)]">
@@ -98,6 +98,8 @@ export default function RiskPage() {
                             <th className="pb-2 font-medium text-right">Sample</th>
                             <th className="pb-2 font-medium text-right">Shares</th>
                             <th className="pb-2 font-medium text-right">Shrunk</th>
+                            <th className="pb-2 font-medium text-right">Shares</th>
+                            <th className="pb-2 font-medium text-right">Min var</th>
                             <th className="pb-2 font-medium text-right">Shares</th>
                         </tr>
                     </thead>
@@ -110,6 +112,8 @@ export default function RiskPage() {
                                 <td className="py-2 text-right">{row.sampleShares == null ? "—" : formatNumber(row.sampleShares, 0)}</td>
                                 <td className="py-2 text-right">{formatPctAbs(row.shrunkWeight)}</td>
                                 <td className="py-2 text-right">{row.shrunkShares == null ? "—" : formatNumber(row.shrunkShares, 0)}</td>
+                                <td className="py-2 text-right">{formatPctAbs(row.minVarWeight)}</td>
+                                <td className="py-2 text-right">{row.minVarShares == null ? "—" : formatNumber(row.minVarShares, 0)}</td>
                             </tr>
                         ))}
                     </tbody>

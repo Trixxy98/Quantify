@@ -184,6 +184,7 @@ export type PortfolioRisk = {
         currentVolatility: number;
         sample: {weights: number[]; volatility: number; intensity: number};
         shrunk: {weights: number[]; volatility: number; intensity: number};
+        minimumVariance: {weights: number[]; volatility: number};
         trades: {
             symbol: string;
             currentWeight: number;
@@ -191,6 +192,8 @@ export type PortfolioRisk = {
             shrunkWeight: number;
             sampleShares: number | null;
             shrunkShares: number | null;
+            minVarWeight: number;
+            minVarShares: number | null;
         }[];
         note: string;
     } | null;
