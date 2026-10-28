@@ -15,7 +15,7 @@ export function AgentRunsCard({agents, runs}: {agents: AgentsOverview["agents"];
         <div className="rounded-xl bg-[var(--color-surface)] p-5 overflow-x-auto">
             <h2 className="mb-3 text-sm font-medium">Latest month-end pass</h2>
             <table className="w-full text-sm">
-                <thead className="text-left text-[11px] font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
+                <thead className="text-left text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                     <tr>
                         <th className="pb-2 font-medium">Agent</th>
                         <th className="pb-2 font-medium">Model</th>

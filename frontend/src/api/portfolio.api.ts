@@ -18,8 +18,10 @@ import type {
   FactorExposure,
 } from "../types/api.types";
 
-export async function createTransaction(portfolioId: string, input: CreateTransactionInput) {
-  const {data} = await apiClient.post(`/portfolios/${portfolioId}/transactions`, input);
+export type TradeRefreshResult = {refreshStatus: "complete" | "pending" | "failed"};
+
+export async function createTransaction(portfolioId: string, input: CreateTransactionInput): Promise<TradeRefreshResult> {
+  const {data} = await apiClient.post<TradeRefreshResult>(`/portfolios/${portfolioId}/transactions`, input);
   return data;
 }
 
@@ -122,8 +124,8 @@ export async function updateTransaction(
   portfolioId: string,
   transactionId: string,
   input: UpdateTransactionInput
-) {
-  const {data} = await apiClient.patch(`/portfolios/${portfolioId}/transactions/${transactionId}`, input);
+): Promise<TradeRefreshResult> {
+  const {data} = await apiClient.patch<TradeRefreshResult>(`/portfolios/${portfolioId}/transactions/${transactionId}`, input);
   return data;
 }
 

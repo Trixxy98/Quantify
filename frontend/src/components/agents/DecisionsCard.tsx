@@ -17,7 +17,7 @@ export function DecisionsCard({decisions}: {decisions: AgentsOverview["decisions
                 <p className="text-sm text-[var(--color-text-muted)]">No decision for this month.</p>
             ) : (
                 <table className="w-full text-sm">
-                    <thead className="text-left text-[11px] font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
+                    <thead className="text-left text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                         <tr>
                             <th className="pb-2 font-medium">Name</th>
                             <th className="pb-2 font-medium">Action</th>

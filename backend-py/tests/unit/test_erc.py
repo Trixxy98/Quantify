@@ -1,6 +1,9 @@
 import pytest
 
+from app.models import Exchange
+from app.services.risk import _erc
 from app.services.risk_math import constant_correlation_shrink, erc_weights, minimum_variance_weights, portfolio_risk
+from app.services.valuation import OpenPositionMark
 
 
 def test_two_assets_match_the_inverse_volatility_weights():
@@ -62,3 +65,28 @@ def test_minimum_variance_matches_equal_weights_when_assets_match():
     assert weights == [pytest.approx(1 / 3)] * 3
     assert all(weight >= 0 for weight in weights)
     assert sum(weights) == pytest.approx(1)
+
+
+@pytest.mark.parametrize("usd_to_myr", [1, 4])
+def test_erc_share_suggestions_use_base_currency_prices(usd_to_myr):
+    marks = {
+        "LOCAL": OpenPositionMark("LOCAL", Exchange.BURSA, "MYR", 10, 100, 1000, 100, None, 1000, None, None),
+        "FOREIGN": OpenPositionMark(
+            "FOREIGN", Exchange.US, "USD", 10, 100, 1000, 100, None, 1000 * usd_to_myr, None, None
+        ),
+    }
+    total_value = sum(mark.market_value for mark in marks.values())
+    current = [marks[symbol].market_value / total_value for symbol in marks]
+    columns = [[0.1, -0.1] * 20, [0.05, 0.05, -0.05, -0.05] * 10]
+    erc = _erc(list(marks), current, columns, [[0.04, 0], [0, 0.01]], marks, total_value, True)
+
+    assert erc is not None
+    for trade in erc["trades"]:
+        mark = marks[trade["symbol"]]
+        base_price = mark.last_price * (usd_to_myr if mark.currency == "USD" else 1)
+        for weight_key, shares_key in (
+            ("sampleWeight", "sampleShares"),
+            ("shrunkWeight", "shrunkShares"),
+            ("minVarWeight", "minVarShares"),
+        ):
+            assert trade[shares_key] == round((trade[weight_key] - trade["currentWeight"]) * total_value / base_price)

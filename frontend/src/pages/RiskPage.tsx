@@ -6,6 +6,7 @@ import {RangeChips} from "../components/dashboard/RangeChips";
 import type {AppShellContext} from "../components/layout/AppShell";
 import {usePortfolioRisk} from "../hooks/usePortfolioRisk";
 import type {Range} from "../types/api.types";
+import {chartPalette} from "../utils/chartPalette";
 import {formatNumber, formatPct, formatPctAbs} from "../utils/format";
 
 function heat(value: number) {
@@ -26,15 +27,15 @@ export default function RiskPage() {
     return (
         <>
         <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-sm font-medium text-[var(--color-text-muted)]">Risk</h2>
+            <h1 className="text-2xl font-semibold">Risk</h1>
             <RangeChips value={range} onChange={setRange} />
         </div>
 
         {data?.notes.map((note) => (
-            <p key={note} className="text-sm text-[var(--color-text-muted)]">{note}</p>
+            <p key={note} className="notice">{note}</p>
         ))}
 
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard label="Volatility" value={path ? formatPctAbs(path.volatility) : "—"} hint="TWR, annualized" isLoading={isLoading} />
         <MetricCard label="VaR 95%" value={path?.var95 != null ? formatPct(path.var95) : "—"} hint="Historical daily" tone={path?.var95 ?? undefined} isLoading={isLoading} />
         <MetricCard label="Expected shortfall 95%" value={path?.es95 != null ? formatPct(path.es95) : "—"} hint="Mean beyond VaR" tone={path?.es95 ?? undefined} isLoading={isLoading} />
@@ -124,7 +125,7 @@ export default function RiskPage() {
         {data && data.correlation.symbols.length > 1 && (
             <div className="rounded-xl bg-[var(--color-surface)] p-5 overflow-x-auto">
                 <h2 className="text-sm text-[var(--color-text-muted)] mb-4">Correlation</h2>
-                <table className="text-xs">
+                <table className="text-sm">
                     <thead>
                         <tr>
                             <th />
@@ -158,8 +159,8 @@ export default function RiskPage() {
                         <CartesianGrid stroke="#334155" strokeDasharray="3 3" />
                         <XAxis dataKey="date" tick={{fill: "#94a3b8", fontSize: 12}} tickFormatter={(value: string) => value.slice(5)} />
                         <YAxis tick={{fill: "#94a3b8", fontSize: 12}} tickFormatter={(value: number) => `${(value * 100).toFixed(0)}%`} />
-                        <Tooltip contentStyle={{backgroundColor: "#1e293b", border: "1px solid #334155"}} formatter={(value) => [formatPct(Number(value)), "Drawdown"]} />
-                        <Line type="monotone" dataKey="drawdown" stroke="#ef4444" dot={false} strokeWidth={2} />
+                        <Tooltip contentStyle={{backgroundColor: "#1e293b", border: "1px solid #334155"}} labelStyle={{color: "#f1f5f9"}} formatter={(value) => [formatPct(Number(value)), "Drawdown"]} />
+                        <Line type="monotone" dataKey="drawdown" stroke={chartPalette.ruby} dot={false} strokeWidth={2} />
                     </LineChart>
                 </ResponsiveContainer>
                 </div>
@@ -172,9 +173,9 @@ export default function RiskPage() {
                         <CartesianGrid stroke="#334155" strokeDasharray="3 3" />
                         <XAxis dataKey="date" tick={{fill: "#94a3b8", fontSize: 12}} tickFormatter={(value: string) => value.slice(5)} />
                         <YAxis tick={{fill: "#94a3b8", fontSize: 12}} />
-                        <Tooltip contentStyle={{backgroundColor: "#1e293b", border: "1px solid #334155"}} />
-                        <Line type="monotone" dataKey="vol" name="Vol" stroke="#38bdf8" dot={false} strokeWidth={2} />
-                        <Line type="monotone" dataKey="beta" name="Beta" stroke="#a78bfa" dot={false} strokeWidth={2} />
+                        <Tooltip contentStyle={{backgroundColor: "#1e293b", border: "1px solid #334155"}} labelStyle={{color: "#f1f5f9"}} />
+                        <Line type="monotone" dataKey="vol" name="Vol" stroke={chartPalette.cyan} dot={false} strokeWidth={2} />
+                        <Line type="monotone" dataKey="beta" name="Beta" stroke={chartPalette.violet} dot={false} strokeWidth={2} />
                     </LineChart>
                 </ResponsiveContainer>
                 </div>

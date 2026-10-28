@@ -1,4 +1,4 @@
-import { useOutletContext } from "react-router-dom";
+import { Link, useOutletContext } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { MetricCard } from "../components/dashboard/MetricCard";
 import { AllocationChart } from "../components/dashboard/AllocationChart";
@@ -8,6 +8,7 @@ import { usePortfolioAllocation } from "../hooks/usePortfolioAllocation";
 import { usePortfolioMetrics } from "../hooks/usePortfolioMetrics";
 import { usePortfolioPerformance } from "../hooks/usePortfolioPerformance";
 import { usePortfolioSummary } from "../hooks/usePortfolioSummary";
+import { useTransactions } from "../hooks/useTransactions";
 import type { AppShellContext } from "../components/layout/AppShell";
 import { formatInterval, formatMoney, formatNumber, formatPct, formatPctAbs } from "../utils/format";
 import type { Range } from "../types/api.types";
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   );
   const { data: performance, isLoading: isPerformanceLoading } = usePortfolioPerformance(portfolioId, range);
   const { data: allocation, isLoading: isAllocationLoading } = usePortfolioAllocation(portfolioId);
+  const { data: transactions, isLoading: isTransactionsLoading, isError: isTransactionsError } = useTransactions(portfolioId, 1);
 
   const currency = summary?.baseCurrency ?? "MYR";
   const metricsHint = useMemo(() => {
@@ -36,25 +38,38 @@ export default function DashboardPage() {
 
   if (!portfolioId) return null;
 
+  if (!isTransactionsLoading && transactions?.pagination.total === 0) {
+    return (
+      <section className="rounded-xl bg-[var(--color-surface)] p-6 sm:p-8 space-y-4">
+        <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-accent)]">Getting started</p>
+        <h1 className="text-2xl font-semibold">Your portfolio is ready</h1>
+        <p className="text-sm text-[var(--color-text-muted)]">Add a trade to build holdings and analytics. Then sync market data and check Data for gaps before reviewing Overview and Analysis.</p>
+        <Link to="/transactions" className="inline-block rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-[#09231e] hover:brightness-110">Add your first trade</Link>
+      </section>
+    );
+  }
+
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-medium text-[var(--color-text-muted)]">Overview</h2>
+        <div><p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-accent)]">Portfolio</p><h1 className="mt-1 text-2xl font-semibold">Overview</h1></div>
         <RangeChips value={range} onChange={setRange} />
       </div>
 
+      {isTransactionsError && <p role="alert" className="notice notice-error">Could not check your transactions; verify your data before relying on these figures.</p>}
+
       {metricsHint && (
-        <p className="text-sm text-[var(--color-text-muted)]">{metricsHint}</p>
+        <p className="notice">{metricsHint}</p>
       )}
 
       {metrics?.isLowConfidence && (
-        <p className="text-sm text-[var(--color-text-muted)]">
+        <p className="notice">
           Only {metrics.observations} daily observations in this range. Sharpe, volatility and beta
           are estimates, not measurements, at this sample size.
         </p>
       )}
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <MetricCard
           label="Portfolio Value"
           value={summary ? formatMoney(summary.totalValue, currency) : "—"}

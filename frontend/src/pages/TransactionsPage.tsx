@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { Link, useOutletContext } from "react-router-dom";
 import { AddTransactionForm } from "../components/dashboard/AddTransactionForm";
 import { TimingCard } from "../components/dashboard/TimingCard";
 import { TransactionsTable } from "../components/dashboard/TransactionsTable";
@@ -23,7 +23,10 @@ export default function TransactionsPage() {
 
   return (
     <>
-      <h2 className="text-sm font-medium text-[var(--color-text-muted)]">Transactions</h2>
+      <h1 className="text-2xl font-semibold">Transactions</h1>
+      {data?.pagination.total === 0 && (
+        <p className="notice">Record your first BUY below. Once saved, sync prices and check <Link to="/data">Data</Link> before reviewing analytics.</p>
+      )}
       <AddTransactionForm
         key={editing?.id ?? "new"}
         portfolioId={portfolioId}

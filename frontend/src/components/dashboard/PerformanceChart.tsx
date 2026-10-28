@@ -9,6 +9,7 @@ import {
   YAxis,
 } from "recharts";
 import type { PortfolioPerformance } from "../../types/api.types";
+import { chartPalette } from "../../utils/chartPalette";
 
 type Props = {
   data: PortfolioPerformance | undefined;
@@ -77,7 +78,7 @@ export function PerformanceChart({ data, isLoading }: Props) {
               type="monotone"
               dataKey="portfolio"
               name="Portfolio"
-              stroke="#22c55e"
+              stroke={chartPalette.portfolio}
               dot={false}
               strokeWidth={2}
             />
@@ -86,7 +87,7 @@ export function PerformanceChart({ data, isLoading }: Props) {
                 type="monotone"
                 dataKey="klci"
                 name="KLCI"
-                stroke="#38bdf8"
+                stroke={chartPalette.klci}
                 dot={false}
                 strokeWidth={2}
                 connectNulls
@@ -97,7 +98,7 @@ export function PerformanceChart({ data, isLoading }: Props) {
                 type="monotone"
                 dataKey="spx"
                 name={spxLabel}
-                stroke="#a78bfa"
+                stroke={chartPalette.spx}
                 dot={false}
                 strokeWidth={2}
                 connectNulls

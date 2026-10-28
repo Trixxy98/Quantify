@@ -33,7 +33,7 @@ export function ScoreboardTable({scores, agents}: {scores: AgentScore[]; agents:
                 Out of sample. An IC of 0 is chance. A QLIKE gain of 0 is no better than last month's vol.
             </p>
             <table className="w-full text-sm">
-                <thead className="text-left text-[11px] font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
+                <thead className="text-left text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                     <tr>
                         <th className="pb-2 font-medium">Model</th>
                         <th className="pb-2 font-medium">Measure</th>
