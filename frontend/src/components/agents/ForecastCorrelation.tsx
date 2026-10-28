@@ -21,7 +21,7 @@ export function ForecastCorrelation({correlation}: {correlation: AgentsOverview[
                 <p className="text-sm text-[var(--color-text-muted)]">Need two return agents before a correlation exists.</p>
             ) : (
                 <table className="text-sm">
-                    <thead className="text-left text-[11px] font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
+                    <thead className="text-left text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                         <tr>
                             <th className="pb-2 pr-6 font-medium" />
                             {agents.map((agent) => (
@@ -34,7 +34,7 @@ export function ForecastCorrelation({correlation}: {correlation: AgentsOverview[
                     <tbody>
                         {agents.map((row) => (
                             <tr key={row} className="border-t border-[var(--color-line)]">
-                                <th className="py-2 pr-6 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
+                                <th className="py-2 pr-6 text-left text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                                     {LABEL[row] ?? row}
                                 </th>
                                 {agents.map((column) => {

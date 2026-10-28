@@ -1,6 +1,7 @@
 import {useState, type FormEvent} from "react";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import axios from "axios";
+import {Link} from "react-router-dom";
 import {createTransaction, updateTransaction} from "../../api/portfolio.api";
 import {useHoldings} from "../../hooks/useHoldings";
 import {useMarketClose} from "../../hooks/useMarketClose";
@@ -61,11 +62,13 @@ export function AddTransactionForm({portfolioId, editing = null, onCancelEdit}: 
             }
             return createTransaction(portfolioId, payload);
         },
-        onSuccess: async () => {
+        onSuccess: async (result) => {
             setError(null);
-            setSuccess(editing
-                ? "Transaction updated. Holdings and charts were refreshed."
-                : "Transaction saved. Holdings and charts were refreshed.");
+            const action = editing ? "updated" : "saved";
+            setSuccess(result.refreshStatus === "complete"
+                ? `Transaction ${action}. Portfolio data refreshed; check Data for market gaps.`
+                : `Transaction ${action}, but portfolio analytics may be stale: ${result.refreshStatus === "pending" ? "a full sync is running" : "the post-trade refresh failed"}. Sync and check Data before relying on analytics.`);
+            queryClient.setQueryData(["portfolio", portfolioId, "tradeRefresh"], result.refreshStatus);
             if (!editing) {
                 setSymbol("");
                 setPrice("");
@@ -101,7 +104,7 @@ export function AddTransactionForm({portfolioId, editing = null, onCancelEdit}: 
         {editing ? `Edit ${type} ${symbol || editing.symbol}` : "Add transaction"}
       </h2>
       {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
-      {success && <p className="text-sm text-[var(--color-accent)]">{success}</p>}
+      {success && <p role="status" className="text-sm text-[var(--color-text-muted)]">{success} <Link to="/data" className="text-[var(--color-accent)] underline">Open Data</Link></p>}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <div className="sm:col-span-2">
           <label htmlFor="tx-symbol" className="block text-xs text-[var(--color-text-muted)] mb-1">

@@ -148,9 +148,10 @@ def _book(cov: list[list[float]]) -> dict[str, Any] | None:
 
 
 def _shares(mark: OpenPositionMark, current: float, target: float, total_value: float) -> int | None:
-    if mark.last_price is None or mark.last_price <= 0:
+    if mark.last_price is None or mark.last_price <= 0 or mark.quantity <= 0 or mark.market_value is None or mark.market_value <= 0:
         return None
-    return round((target - current) * total_value / mark.last_price)
+    base_price = mark.market_value / mark.quantity
+    return round((target - current) * total_value / base_price)
 
 
 def _erc(

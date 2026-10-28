@@ -149,10 +149,10 @@ def recompute_portfolio_holdings(db: Session, portfolio_id: str) -> None:
         raise
 
 
-def _refresh_quietly(db: Session, portfolio_id: str, symbols: list[str]) -> None:
+def _refresh_quietly(db: Session, portfolio_id: str, symbols: list[str]) -> str:
     from app.services.refresh import refresh_portfolio_after_trade_quietly
 
-    refresh_portfolio_after_trade_quietly(db, portfolio_id, symbols)
+    return refresh_portfolio_after_trade_quietly(db, portfolio_id, symbols)
 
 
 def create_transaction(db: Session, portfolio_id: str, user_id: str, data: dict[str, Any]) -> dict[str, Any]:
@@ -178,7 +178,7 @@ def create_transaction(db: Session, portfolio_id: str, user_id: str, data: dict[
         raise
     db.refresh(transaction)
     result = row_dict(transaction)
-    _refresh_quietly(db, portfolio_id, [symbol])
+    result["refreshStatus"] = _refresh_quietly(db, portfolio_id, [symbol])
     return result
 
 
@@ -208,7 +208,7 @@ def update_transaction(db: Session, portfolio_id: str, transaction_id: str, user
         raise
     db.refresh(existing)
     result = row_dict(existing)
-    _refresh_quietly(db, portfolio_id, [previous_symbol, symbol])
+    result["refreshStatus"] = _refresh_quietly(db, portfolio_id, [previous_symbol, symbol])
     return result
 
 

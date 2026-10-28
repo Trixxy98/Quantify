@@ -1,20 +1,30 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0c1222;
-  --color-surface: #151d2e;
-  --color-accent: #3dbe86;
-  --color-danger: #f07178;
-  --color-text: #e7edf5;
-  --color-text-muted: #8b9bb4;
-  --color-line: #243049;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Supporting copy and controls should remain readable on dense finance screens. */
+  --text-xs: 0.875rem;
+  --text-xs--line-height: 1.45;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.5;
+  --color-bg: #0b1421;
+  --color-surface: #142235;
+  --color-accent: #65c9ae;
+  --color-danger: #fb8589;
+  --color-text: #edf3f8;
+  --color-text-muted: #a3b4c7;
+  --color-line: #304258;
 }
+
+html { color-scheme: dark; }
 
 body {
   margin: 0;
-  background-color: var(--color-bg);
+  background: radial-gradient(ellipse at 50% -15%, #18324a 0%, var(--color-bg) 55%) fixed;
   color: var(--color-text);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -22,6 +32,49 @@ body {
 main .rounded-xl {
   border: 1px solid var(--color-line);
 }
+
+main :is(h1, h2, h3) { letter-spacing: -0.015em; line-height: 1.3; }
+main h1 { font-size: clamp(1.5rem, 1.25rem + 1vw, 1.875rem); font-weight: 650; }
+main h2 { font-size: 1.125rem; font-weight: 600; color: var(--color-text); }
+main h3 { font-size: 1rem; font-weight: 600; color: var(--color-text); }
+main table { font-variant-numeric: tabular-nums; }
+main .overflow-x-auto table { min-width: max-content; }
+main table th { white-space: nowrap; font-size: 0.875rem; line-height: 1.4; }
+main table td { font-size: 0.875rem; line-height: 1.5; }
+main table td, main table th { padding-left: 0.65rem; padding-right: 0.65rem; }
+main table td:first-child, main table th:first-child { padding-left: 0; }
+main table td:last-child, main table th:last-child { padding-right: 0; }
+main table tbody tr { border-top: 1px solid var(--color-line); }
+
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+label { font-weight: 500; }
+input, select, textarea, button { font-family: inherit; }
+input::placeholder, textarea::placeholder { color: var(--color-text-muted); opacity: 1; }
+
+@media (max-width: 639px) {
+  /* Prevent iOS from zooming the viewport when a form control receives focus. */
+  input, select, textarea { font-size: 1rem; }
+}
+
+button:not(:disabled) { cursor: pointer; }
+
+.notice {
+  border: 1px solid var(--color-line);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 0.75rem;
+  background: var(--color-surface);
+  padding: 1rem 1.25rem;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.notice-error { border-left-color: var(--color-danger); }
+.notice a { color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px; }
 
 /* Ticker tape: the track holds two identical copies, so -50% is exactly one loop. */
 @keyframes ticker-scroll {

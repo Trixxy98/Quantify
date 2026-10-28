@@ -54,7 +54,7 @@ export default function FactorsPage() {
         <>
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h2 className="text-sm font-medium text-[var(--color-text-muted)]">Factors</h2>
+                    <h1>Factors</h1>
                     <p className="mt-1 max-w-3xl text-xs text-[var(--color-text-muted)]">
                         Fama–French five factors plus momentum, on the US sleeve only. Bursa holdings are not in this
                         regression.

@@ -16,6 +16,7 @@ import {MetricCard} from "../components/dashboard/MetricCard";
 import type {AppShellContext} from "../components/layout/AppShell";
 import {useMomentum} from "../hooks/useMomentum";
 import type {MomentumStats} from "../types/api.types";
+import {chartPalette} from "../utils/chartPalette";
 import {formatInterval, formatNumber, formatPct, formatPctAbs} from "../utils/format";
 
 const chip = (active: boolean) =>
@@ -63,7 +64,7 @@ export default function ResearchPage() {
         <>
             <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
-                    <h2 className="text-sm font-medium text-[var(--color-text-muted)]">Research</h2>
+                    <h1>Research</h1>
                     <p className="mt-1 max-w-3xl text-xs text-[var(--color-text-muted)]">
                         One signal, not a search. 12-1 momentum, monthly, top third. Out of sample by construction:
                         the rank cannot see the month it is held.
@@ -155,12 +156,12 @@ export default function ResearchPage() {
                                 <CartesianGrid stroke="#334155" strokeDasharray="3 3" />
                                 <XAxis dataKey="date" tick={{fill: "#94a3b8", fontSize: 11}} minTickGap={32} />
                                 <YAxis scale={logScale ? "log" : "auto"} domain={["auto", "auto"]} tick={{fill: "#94a3b8", fontSize: 12}} />
-                                <Tooltip contentStyle={{background: "#0f172a", border: "1px solid #334155"}} />
+                                <Tooltip contentStyle={{background: "#0f172a", border: "1px solid #334155"}} labelStyle={{color: "#f1f5f9"}} />
                                 <Legend />
-                                <Line type="monotone" dataKey="strategy" name="Momentum" stroke="#22c55e" dot={false} strokeWidth={2} />
-                                <Line type="monotone" dataKey="buyHold" name="Buy and hold" stroke="#94a3b8" dot={false} />
-                                <Line type="monotone" dataKey="equalWeight" name="Equal weight" stroke="#38bdf8" dot={false} />
-                                <Line type="monotone" dataKey="benchmark" name={data.benchmarkSymbol ?? "S&P 500"} stroke="#f59e0b" dot={false} />
+                                <Line type="monotone" dataKey="strategy" name="Momentum" stroke={chartPalette.portfolio} dot={false} strokeWidth={2.5} />
+                                <Line type="monotone" dataKey="buyHold" name="Buy and hold" stroke={chartPalette.klci} dot={false} strokeWidth={2} />
+                                <Line type="monotone" dataKey="equalWeight" name="Equal weight" stroke={chartPalette.violet} dot={false} strokeWidth={2} />
+                                <Line type="monotone" dataKey="benchmark" name={data.benchmarkSymbol ?? "S&P 500"} stroke={chartPalette.spx} dot={false} strokeWidth={2} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -178,9 +179,10 @@ export default function ResearchPage() {
                                 <YAxis tick={{fill: "#94a3b8", fontSize: 12}} tickFormatter={(value: number) => `${(value * 100).toFixed(0)}%`} />
                                 <Tooltip
                                     contentStyle={{background: "#0f172a", border: "1px solid #334155"}}
+                                    labelStyle={{color: "#f1f5f9"}}
                                     formatter={(value) => formatPct(Number(value))}
                                 />
-                                <Line type="monotone" dataKey="value" name="Excess" stroke="#a78bfa" dot={false} strokeWidth={1.5} />
+                                <Line type="monotone" dataKey="value" name="Excess" stroke={chartPalette.violet} dot={false} strokeWidth={2} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>

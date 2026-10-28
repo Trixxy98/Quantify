@@ -43,7 +43,7 @@ export default function HoldingsPage() {
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-medium text-[var(--color-text-muted)]">Holdings</h2>
+        <h1 className="text-2xl font-semibold">Holdings</h1>
         <RangeChips value={range} onChange={setRange} />
       </div>
 
@@ -54,8 +54,8 @@ export default function HoldingsPage() {
           isLoading={isPricesLoading}
         />
       ) : (
-        <div className="h-72 rounded-xl bg-[var(--color-surface)] flex items-center justify-center text-sm text-[var(--color-text-muted)]">
-          Select a holding to view its price chart
+        <div className="flex h-64 items-center justify-center rounded-xl bg-[var(--color-surface)] p-6 text-center text-sm text-[var(--color-text-muted)]">
+          {isHoldingsLoading || isClosedLoading ? "Loading holdings…" : "No holdings to chart yet. Add a trade in Transactions to get started."}
         </div>
       )}
 

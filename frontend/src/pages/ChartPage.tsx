@@ -19,6 +19,7 @@ import { useHoldings } from "../hooks/useHoldings";
 import { usePortfolioPerformance } from "../hooks/usePortfolioPerformance";
 import { usePortfolioRisk } from "../hooks/usePortfolioRisk";
 import type { Range } from "../types/api.types";
+import {chartPalette, holdingLineColors} from "../utils/chartPalette";
 import {
   DEFAULT_SERIES,
   readChartViews,
@@ -31,7 +32,14 @@ import {
 } from "../utils/chartViews";
 
 const WINDOWS: ChartWindow[] = [20, 60, 120];
-const COLORS = ["#22c55e", "#38bdf8", "#a78bfa", "#f59e0b", "#fb7185", "#e2e8f0", "#34d399", "#818cf8"];
+const SERIES_COLORS: Record<string, string> = {
+  portfolio: chartPalette.portfolio,
+  klci: chartPalette.klci,
+  spx: chartPalette.spx,
+  underwater: chartPalette.ruby,
+  vol: chartPalette.cyan,
+  beta: chartPalette.violet,
+};
 
 type LevelPoint = {date: string; value: number};
 
@@ -225,7 +233,7 @@ export default function ChartPage() {
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-medium text-[var(--color-text-muted)]">Chart</h2>
+        <h1>Chart</h1>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex gap-1.5">
             {WINDOWS.map((item) => (
@@ -400,7 +408,7 @@ export default function ChartPage() {
                     type="monotone"
                     dataKey={item.id}
                     name={catalog.find((row) => row.id === item.id)?.label ?? item.id}
-                    stroke={COLORS[index % COLORS.length]}
+                    stroke={SERIES_COLORS[item.id] ?? holdingLineColors[index % holdingLineColors.length]}
                     dot={false}
                     strokeWidth={2}
                     connectNulls

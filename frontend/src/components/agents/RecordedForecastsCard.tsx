@@ -21,7 +21,7 @@ export function RecordedForecastsCard({title, caption, recorded, format}: Props)
             {rows.length > 0 && (
                 <div className="max-h-80 overflow-y-auto">
                     <table className="w-full text-sm">
-                        <thead className="text-left text-[11px] font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
+                        <thead className="text-left text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                             <tr>
                                 <th className="pb-2 font-medium">#</th>
                                 <th className="pb-2 font-medium">Symbol</th>

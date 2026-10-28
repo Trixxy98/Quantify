@@ -14,11 +14,14 @@ type Props = {
 export function TransactionsTable({ portfolioId, editingId, onEdit }: Props) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
-  const { data, isLoading } = useTransactions(portfolioId, page);
+  const [notice, setNotice] = useState(false);
+  const { data, isLoading, isError } = useTransactions(portfolioId, page);
 
   const mutation = useMutation({
     mutationFn: (transactionId: string) => deleteTransaction(portfolioId, transactionId),
     onSuccess: async () => {
+      queryClient.setQueryData(["portfolio", portfolioId, "tradeRefresh"], "pending");
+      setNotice(true);
       await queryClient.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
       await queryClient.invalidateQueries({ queryKey: ["research"] });
       await queryClient.invalidateQueries({ queryKey: ["market", "health"] });
@@ -35,8 +38,12 @@ export function TransactionsTable({ portfolioId, editingId, onEdit }: Props) {
   return (
     <div className="rounded-xl bg-[var(--color-surface)] p-5 overflow-x-auto">
       <h2 className="text-sm text-[var(--color-text-muted)] mb-4">Transactions</h2>
+      {notice && <p role="status" className="mb-3 text-sm text-[var(--color-text-muted)]">Transaction deleted. Analytics may be stale until you sync and check Data.</p>}
+      {mutation.isError && <p role="alert" className="mb-3 text-sm text-[var(--color-danger)]">Could not delete transaction. Please retry.</p>}
 
-      {rows.length === 0 ? (
+      {isError ? (
+        <p className="text-sm text-[var(--color-danger)]">Could not load transactions. Please retry.</p>
+      ) : rows.length === 0 ? (
         <p className="text-sm text-[var(--color-text-muted)]">No transactions yet</p>
       ) : (
         <table className="w-full text-sm">

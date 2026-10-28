@@ -10,12 +10,12 @@ type MetricCardProps = {
 
 export function MetricCard({label, value, hint, tone, isLoading}: MetricCardProps) {
     return (
-        <div className="rounded-xl bg-[var(--color-surface)] p-4 space-y-1">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--color-text-muted)]">{label}</p>
+        <div className="min-w-0 rounded-xl bg-[var(--color-surface)] p-5 space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">{label}</p>
             {isLoading ? (
                 <div className="h-7 w-28 rounded bg-slate-700/50 animate-pulse" />
             ) : (
-                <p className={`text-xl font-semibold tabular-nums ${tone !== undefined ? toneClass(tone) : ""}`}>
+                <p className={`break-words text-xl font-semibold leading-tight tracking-tight tabular-nums sm:text-2xl ${tone !== undefined ? toneClass(tone) : ""}`}>
                     {value}
                 </p>
             )}

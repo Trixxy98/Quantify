@@ -115,7 +115,7 @@ export default function AgentsPage() {
         <>
             <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                    <h2 className="text-lg font-semibold tracking-tight">Agents</h2>
+                    <h1>Agents</h1>
                     <p className="mt-1 max-w-2xl text-sm text-[var(--color-text-muted)]">
                         Statistical models with a public track record. One-month is the decision horizon. Five sessions is reported beside it.
                     </p>
@@ -166,7 +166,7 @@ export default function AgentsPage() {
                 <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {view.families.map((agent) => (
                         <div key={agent.name} className="rounded-xl bg-[var(--color-surface)] p-4">
-                            <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--color-text-muted)]">{agent.label}</p>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">{agent.label}</p>
                             <p className="mt-2 text-sm leading-relaxed text-[var(--color-text)]">{agent.description}</p>
                         </div>
                     ))}

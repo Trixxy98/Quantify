@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import type { HoldingPriceSeries } from "../../types/api.types";
+import { chartPalette } from "../../utils/chartPalette";
 import { formatMoney, formatPct } from "../../utils/format";
 
 type Props = {
@@ -131,9 +132,9 @@ export function PriceChart({ data, avgCost, isLoading }: Props) {
             {showAvgCost && (
               <ReferenceLine
                 y={avgCost}
-                stroke="#f59e0b"
+                stroke={chartPalette.spx}
                 strokeDasharray="4 4"
-                label={{ value: "Avg cost", fill: "#f59e0b", fontSize: 12 }}
+                label={{ value: "Avg cost", fill: chartPalette.spx, fontSize: 12 }}
               />
             )}
             {drawdown && (
@@ -142,14 +143,14 @@ export function PriceChart({ data, avgCost, isLoading }: Props) {
                   x={drawdown.peakDate}
                   y={drawdown.peakClose}
                   r={4}
-                  fill="#22c55e"
+                  fill={chartPalette.portfolio}
                   stroke="none"
                 />
                 <ReferenceDot
                   x={drawdown.troughDate}
                   y={drawdown.troughClose}
                   r={4}
-                  fill="#ef4444"
+                  fill={chartPalette.ruby}
                   stroke="none"
                 />
               </>
@@ -158,7 +159,7 @@ export function PriceChart({ data, avgCost, isLoading }: Props) {
               type="monotone"
               dataKey="close"
               name="Close"
-              stroke="#38bdf8"
+              stroke={chartPalette.klci}
               dot={false}
               strokeWidth={2}
             />

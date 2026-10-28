@@ -35,7 +35,7 @@ export default function AnalysisPage() {
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-medium text-[var(--color-text-muted)]">Analysis</h2>
+        <h1>Analysis</h1>
         <RangeChips value={range} onChange={setRange} />
       </div>
 

@@ -51,9 +51,9 @@ def _ensure_benchmarks(db: Session, from_: datetime) -> None:
             market.sync_benchmark_prices(db, symbol, from_)
 
 
-def refresh_portfolio_after_trade(db: Session, portfolio_id: str, symbols: list[str]) -> None:
+def refresh_portfolio_after_trade(db: Session, portfolio_id: str, symbols: list[str]) -> bool:
     if is_full_sync_running():
-        return
+        return False
     unique = list(dict.fromkeys(symbol.upper() for symbol in symbols if symbol))
     for symbol in unique:
         earliest = db.scalar(
@@ -69,11 +69,13 @@ def refresh_portfolio_after_trade(db: Session, portfolio_id: str, symbols: list[
         _ensure_usd_myr(db, from_)
         _ensure_benchmarks(db, from_)
     rebuild_snapshots(db, portfolio_id)
+    return True
 
 
-def refresh_portfolio_after_trade_quietly(db: Session, portfolio_id: str, symbols: list[str]) -> None:
+def refresh_portfolio_after_trade_quietly(db: Session, portfolio_id: str, symbols: list[str]) -> str:
     try:
-        refresh_portfolio_after_trade(db, portfolio_id, symbols)
+        return "complete" if refresh_portfolio_after_trade(db, portfolio_id, symbols) else "pending"
     except Exception:
         db.rollback()
         log.exception("[trade] market refresh failed %s %s", portfolio_id, symbols)
+        return "failed"

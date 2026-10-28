@@ -67,7 +67,7 @@ export default function EventsPage() {
   return (
     <>
       <div>
-        <h2 className="text-sm font-medium text-[var(--color-text-muted)]">Event study</h2>
+        <h1>Event study</h1>
         <p className="mt-1 max-w-3xl text-xs text-[var(--color-text-muted)]">
           How a name behaves around information events instead of chart patterns. Returns are measured against a
           market model fitted before each event, so what is left is the reaction.

@@ -1,3 +1,4 @@
+import {Link} from "react-router-dom";
 import {HealthTable} from "../components/data/HealthTable";
 import {SyncRunsCard} from "../components/data/SyncRunsCard";
 import {MetricCard} from "../components/dashboard/MetricCard";
@@ -10,14 +11,17 @@ export default function DataPage() {
     return (
         <>
             <div>
-                <h2 className="text-sm font-medium text-[var(--color-text-muted)]">Data</h2>
+                <h1 className="text-2xl font-semibold">Data health</h1>
                 <p className="mt-1 max-w-3xl text-xs text-[var(--color-text-muted)]">
                     Read-only checks on the stored series behind every number in the app, worst first.
                     {data && ` Latest session expected: US ${data.expected.US}, Bursa ${data.expected.BURSA}.`}
                 </p>
+                <p className="notice mt-4">
+                    After adding trades, use Sync in the header, check the latest run and any problems below, then review <Link to="/dashboard" className="text-[var(--color-accent)] underline">Overview</Link> and <Link to="/analysis" className="text-[var(--color-accent)] underline">Analysis</Link>. A failed or missing sync does not mean analytics are up to date.
+                </p>
             </div>
 
-            {isError && <p className="text-sm text-[var(--color-danger)]">Could not load the data checks.</p>}
+            {isError && <p role="alert" className="notice notice-error">Could not load the data checks.</p>}
 
             <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <MetricCard label="Problems" value={data ? String(data.counts.bad) : "—"} hint="series to fix or explain" isLoading={isLoading} />

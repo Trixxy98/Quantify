@@ -77,7 +77,9 @@ def build_level(closes: list[dict[str, Any]], dividends: list[dict[str, Any]]) -
     """Total-return index: closes with dividends reinvested on the ex-date."""
     if not closes:
         return []
-    income = {row["date"]: row["amount"] for row in dividends}
+    income: dict[str, float] = {}
+    for row in dividends:
+        income[row["date"]] = income.get(row["date"], 0.0) + row["amount"]
     level = 100.0
     out = [{"date": closes[0]["date"], "level": level}]
     for i in range(1, len(closes)):

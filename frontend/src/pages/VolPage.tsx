@@ -47,7 +47,7 @@ export default function VolPage() {
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-sm font-medium text-[var(--color-text-muted)]">IV surface</h2>
+          <h1>IV surface</h1>
           <p className="mt-1 max-w-2xl text-xs text-[var(--color-text-muted)]">
             Yahoo options chain → mid price → invert European Black–Scholes (Newton, bisection fallback).
             US listed options are American; treat IV as a teaching approximation. Bursa has no chain here.

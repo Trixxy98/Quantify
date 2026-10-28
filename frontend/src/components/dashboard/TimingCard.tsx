@@ -22,7 +22,7 @@ export function TimingCard({timing}: {timing: TimingSummary | undefined}) {
                 Basis points from the fill to the close. A later rise is a gain on a buy and a cost on a sell. {timing.note}
             </p>
             <table className="w-full text-sm">
-                <thead className="text-left text-[11px] font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
+                <thead className="text-left text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                     <tr>
                         <th className="pb-2 font-medium">Side</th>
                         <th className="pb-2 font-medium">Versus</th>
