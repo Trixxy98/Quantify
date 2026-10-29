@@ -28,7 +28,7 @@ export function useAuthBootstrap(): boolean {
         }
 
         bootstrap();
-    }, []);
+    }, [logout, refreshToken]);
 
     return isReady;
 }

@@ -77,8 +77,6 @@ export function SymbolSearchField({ id, value, onChange, className, holdings }: 
   const query = value.trim();
   const debounced = useDebouncedValue(value, 300);
   const { data, isFetching, isError } = useSymbolSearch(debounced);
-  const remoteHits = data ?? [];
-
   const holdingsList = useMemo(
     () => holdingHits(holdings).filter((hit) => matchesQuery(hit, query)),
     [holdings, query]
@@ -88,8 +86,8 @@ export function SymbolSearchField({ id, value, onChange, className, holdings }: 
     [query]
   );
   const otherHits = useMemo(
-    () => mergeHits(popularList, remoteHits).filter((hit) => !holdingsList.some((h) => h.symbol === hit.symbol)),
-    [popularList, remoteHits, holdingsList]
+    () => mergeHits(popularList, data ?? []).filter((hit) => !holdingsList.some((h) => h.symbol === hit.symbol)),
+    [popularList, data, holdingsList]
   );
 
   function selectSymbol(symbol: string) {

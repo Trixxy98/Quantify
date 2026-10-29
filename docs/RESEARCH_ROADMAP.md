@@ -150,7 +150,7 @@ README *What it is not* section is updated.
 
 ---
 
-### Phase C — Equal risk contribution weights `planned`
+### Phase C — Equal risk contribution weights `done`
 
 **Why.** MCTR/CCTR already say where risk sits. The natural next question is what weights would spread it evenly.
 ERC needs only the covariance matrix, not expected returns, which is why it is preferred here over mean-variance.
@@ -238,7 +238,7 @@ sorted worst first.
 
 ---
 
-### Phase F — Trade decision quality `planned`
+### Phase F — Trade decision quality `done`
 
 **Why.** Realized P&L per closed lot exists. Whether the timing added or cost anything does not.
 
@@ -252,7 +252,7 @@ as descriptive; no significance claims below 30 trades.
 
 ---
 
-### Phase G — Five specialist agents, an orchestrator and a decision engine `next`
+### Phase G — Five specialist agents, an orchestrator and a decision engine `in progress`
 
 **Why.** The natural next question after "does one signal work" is "do several specialists, combined, forecast
 anything?". Each agent here is a statistical model with one job and a public track record, not a language model with
@@ -375,8 +375,8 @@ visible when two "specialists" say the same thing; Sentiment recording progress 
 
 - G1 (`done`): `AgentRun`, `AgentForecast` and `NewsHeadline` tables; orchestrator; headline recorder in the sync
   (first, because only time fills it); Technical agent and Risk (a); scoreboard.
-- G2: Quant, Event and Risk (b); five-session horizon; index view.
-- G3: decision engine with `AgentDecision`, Sentiment agent, live recording at month end, Agents page complete.
+- G2 (`in progress`): Quant, Event and Risk (b); five-session horizon; index view. Implementations and UI are present; verify recorded/live forecasts include the intended SPY view and confirm all G2 scoring criteria before marking complete.
+- G3 (`done`): decision engine with `AgentDecision`, Sentiment agent, live recording at month end, Agents page complete.
 
 **Tests** Shift test per agent (prices moved one session later change the forecast; future prices never do); zod
 rejects a malformed agent output and the run continues without that agent; a second orchestrator pass for the same
@@ -388,8 +388,8 @@ decision rules on a synthetic case for each rule, including a skipped conflict a
 **Out of scope** Language-model forecasts, deep learning, gradient boosting (no dependency-free implementation worth
 trusting yet), a separate ML service, task queues, intraday features, parameter sweeps.
 
-**Built (G1)** Pure code in `research/agents/`; data loading, the month-end pass and the overview in
-`services/agents.service.ts`; headlines in `services/headlines.service.ts`; Agents page.
+**Built** Pure code in `backend-py/app/research/agents/`; data loading, the month-end pass and overview in
+`backend-py/app/services/agents.py`; headline recording in the market-data sync service; Agents page.
 
 Fixed hyperparameters, as promised above:
 
@@ -469,7 +469,7 @@ F  trade quality (independent; needs only transactions and prices)
 CI (independent)
 ```
 
-A → B → D → G is the research spine. A, B, D, E, CI and G1 are done; G2 is next. C and F can be picked up in any gap.
+A → B → D → G is the research spine. A, B, C, D, E, F, G1, G3 and CI are done; G2's implementation is present, with SPY live-view and scoring acceptance still to verify.
 
 ---
 
