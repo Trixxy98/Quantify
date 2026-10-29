@@ -1,7 +1,8 @@
 import math
 from collections.abc import Sequence
 from typing import Any
-import numpy as np 
+
+import numpy as np
 from scipy.optimize import minimize
 
 from app.services.stats import covariance, std_dev, variance
